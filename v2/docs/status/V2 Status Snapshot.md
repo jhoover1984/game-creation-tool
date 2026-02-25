@@ -249,12 +249,23 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
   - A8: Task list items carry severity-specific border-color using status tokens (`--status-err-bg` for error/fatal, `--status-warn-bg` for warning).
   - A9: Token compliance confirmed green; no raw hex in non-token CSS files.
   - Tests: 2 new viewport startup-fit scenario tests; 4 new shell-structure compliance tests in visual-tokens.test.ts; 1 canvas box-shadow compliance test; 1 test fix (onboarding CTA label assertion); 1 test name updated.
-- test count: 521 (16 contracts + 147 runtime-web + 358 ui-editor) -- verified by per-workspace runs 2026-02-24
+- QA signoff (in progress) -- 2026-02-24 (`UI-SHELL-POLISH-001` QA pass):
+  - Shell-level framing integration tests added (2 tests in `editor-shell-controller.test.ts`): exercise
+    the full `EditorShellController -> fitViewportToMap() -> ViewportController -> applyTransform()` chain.
+    Assert the no-clip invariant (`scaledWidth <= containerWidth`, `scaledHeight <= containerHeight`) on
+    startup and after resize. These replace the previous math-only coverage gap.
+  - V2 UI Blueprint rewritten from implementation notes to a full as-built section with target architecture
+    clearly separated.
+  - Automated gates: passing (367 ui-editor tests, TypeScript build clean, ASCII check clean).
+  - Manual QA matrix: PENDING -- requires human browser verification at 1366x768, 1920x1080, 2560x1440.
+    Checks: startup framing, resize no-clip, utility tab one-click access, quick-action hierarchy, HUD.
+  - Screenshots: PENDING -- 5 required artifacts (see PR checklist).
+- test count: 530 (16 contracts + 147 runtime-web + 367 ui-editor) -- updated 2026-02-24
   - Note: root `npm test` output shows the last workspace (ui-editor) summary as apparent total; use per-workspace counts.
 
 ## Quality Gate Status
 - `npm run ci` (v2): passing
-- TypeScript package tests: 521 passing total (`16 contracts + 147 runtime-web + 358 ui-editor`)
+- TypeScript package tests: 530 passing total (`16 contracts + 147 runtime-web + 367 ui-editor`)
 - Rust workspace tests: passing (separate root workflow scope)
 - Lint/typecheck/tests for v2 packages: passing
 
