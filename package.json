@@ -1,0 +1,11 @@
+{
+  "name": "game-creation-tool",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix apps/desktop",
+    "test": "npm run test --prefix apps/desktop",
+    "build:wasm": "npm run build:wasm --prefix apps/desktop",
+    "build:wasm:debug": "npm run build:wasm:debug --prefix apps/desktop",
+    "tauri": "npm run tauri --prefix apps/desktop"
+  }
+}

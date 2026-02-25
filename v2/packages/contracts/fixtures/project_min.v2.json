@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "2.0.0",
+  "projectId": "proj_demo",
+  "name": "Demo Project",
+  "createdAt": "2026-02-21T00:00:00Z",
+  "updatedAt": "2026-02-21T00:00:00Z",
+  "engine": {
+    "minVersion": "0.1.0",
+    "unitsPerMeter": 16,
+    "defaultTimeStep": 0.0166667,
+    "deterministic": true
+  },
+  "settings": {
+    "renderMode": "pixelPerfect2D",
+    "pixel": {
+      "baseResolution": { "x": 320, "y": 240 },
+      "integerScaleOnly": true
+    },
+    "locale": "en"
+  },
+  "assets": [
+    {
+      "assetId": "asset_player_sheet",
+      "kind": "spriteSheet",
+      "name": "Player Sheet",
+      "path": "assets/sprites/player.png"
+    }
+  ],
+  "maps": [
+    {
+      "mapId": "map_start",
+      "path": "maps/start.map.json"
+    }
+  ],
+  "story": {
+    "questGraph": {
+      "schemaVersion": "2.0.0",
+      "nodes": [
+        {
+          "nodeId": "node_start",
+          "kind": "start",
+          "name": "Begin"
+        }
+      ],
+      "edges": []
+    },
+    "dialogue": {
+      "schemaVersion": "2.0.0",
+      "truthAtoms": [
+        {
+          "atomId": "atom_intro",
+          "pattern": "The hero arrives."
+        }
+      ],
+      "templates": [
+        {
+          "templateId": "tpl_intro",
+          "atomId": "atom_intro",
+          "baseText": "The hero arrives."
+        }
+      ],
+      "stylePacks": [
+        {
+          "styleId": "style_default",
+          "name": "Default",
+          "variants": [
+            {
+              "templateId": "tpl_intro",
+              "choices": ["The hero arrives."]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

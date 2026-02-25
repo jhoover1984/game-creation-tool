@@ -1,0 +1,19 @@
+{
+  "name": "@gcs/runtime-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "pretest": "tsc --build tsconfig.test.json",
+    "test": "node --test dist/**/*.test.js",
+    "test:smoke:golden": "node --test dist/golden-project-smoke.test.js",
+    "dev": "tsc --build --watch"
+  },
+  "dependencies": {
+    "@gcs/contracts": "0.1.0",
+    "ajv": "^8.17.1"
+  }
+}

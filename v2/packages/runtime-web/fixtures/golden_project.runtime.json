@@ -1,0 +1,52 @@
+{
+  "manifest": {
+    "id": "proj_golden",
+    "name": "Golden Runtime Project",
+    "version": "0.1.0",
+    "resolution": { "width": 320, "height": 240 },
+    "tileSize": 16,
+    "createdAt": "2026-02-21T00:00:00Z",
+    "updatedAt": "2026-02-21T00:00:00Z"
+  },
+  "tileLayers": [
+    {
+      "id": "layer-0",
+      "name": "Ground",
+      "width": 8,
+      "height": 8,
+      "tileSize": 16,
+      "data": [
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "ent_player",
+      "name": "Player",
+      "position": { "x": 16, "y": 16 },
+      "size": { "w": 16, "h": 16 },
+      "solid": true,
+      "tags": ["player"]
+    }
+  ],
+  "story": {
+    "questGraph": {
+      "schemaVersion": "2.0.0",
+      "nodes": [
+        { "nodeId": "node_start", "kind": "start", "name": "Start" },
+        { "nodeId": "node_end", "kind": "end", "name": "End" }
+      ],
+      "edges": [
+        { "from": "node_start", "to": "node_end", "label": "Begin" }
+      ]
+    }
+  }
+}

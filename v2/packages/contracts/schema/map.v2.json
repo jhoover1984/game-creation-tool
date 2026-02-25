@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/map.v2.json",
+  "title": "Map V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "mapId",
+    "name",
+    "grid",
+    "layers",
+    "entities",
+    "chunks"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "2.0.0" },
+    "mapId": { "$ref": "common.v2.json#/$defs/Id" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tileSize", "chunkSizeTiles", "origin"],
+      "properties": {
+        "tileSize": { "$ref": "common.v2.json#/$defs/Vec2" },
+        "chunkSizeTiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "integer", "minimum": 8 },
+            "y": { "type": "integer", "minimum": 8 }
+          }
+        },
+        "origin": { "$ref": "common.v2.json#/$defs/Vec3" }
+      }
+    },
+    "layers": { "type": "array", "items": { "type": "object" } },
+    "entities": { "type": "array", "items": { "type": "object" } },
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["chunkId", "coord", "path", "hash"],
+        "properties": {
+          "chunkId": { "$ref": "common.v2.json#/$defs/Id" },
+          "coord": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cx", "cy"],
+            "properties": {
+              "cx": { "type": "integer" },
+              "cy": { "type": "integer" }
+            }
+          },
+          "path": { "type": "string", "minLength": 1 },
+          "hash": { "type": "string", "minLength": 16, "maxLength": 128 }
+        }
+      }
+    }
+  }
+}

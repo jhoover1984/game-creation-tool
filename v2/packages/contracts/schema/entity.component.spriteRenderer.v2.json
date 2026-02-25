@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/entity.component.spriteRenderer.v2.json",
+  "title": "SpriteRenderer Component V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "sprite"],
+  "properties": {
+    "type": { "const": "SpriteRenderer" },
+    "sprite": {
+      "$ref": "common.v2.json#/$defs/ResourceRef",
+      "x-ui": {
+        "widget": "assetRef",
+        "filter": ["sprite", "spriteSheet"]
+      }
+    },
+    "material": { "$ref": "render.materialRef.v2.json" },
+    "zBias": {
+      "type": "number",
+      "default": 0,
+      "x-ui": { "widget": "number", "step": 0.1 }
+    },
+    "flipX": {
+      "type": "boolean",
+      "default": false,
+      "x-ui": { "widget": "toggle" }
+    },
+    "flipY": {
+      "type": "boolean",
+      "default": false,
+      "x-ui": { "widget": "toggle" }
+    }
+  }
+}

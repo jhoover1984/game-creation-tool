@@ -1,0 +1,294 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: PR template governance checks
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          BODY_FILE="$(mktemp)"
+          printf '%s\n' "${PR_BODY:-}" > "$BODY_FILE"
+
+          if ! grep -qiE '^##[[:space:]]+Doc References' "$BODY_FILE"; then
+            echo "PR body must include a '## Doc References' section."
+            exit 1
+          fi
+
+          if ! grep -qiE '^##[[:space:]]+Change-of-Plan Log' "$BODY_FILE"; then
+            echo "PR body must include a '## Change-of-Plan Log' section."
+            exit 1
+          fi
+
+          echo "PR template governance checks passed."
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Documentation governance checks
+        run: |
+          set -euo pipefail
+          required_docs=(
+            "docs/DOCUMENTATION_STANDARDS.md"
+            "docs/DOCUMENTATION_INDEX.md"
+            "docs/contracts/payload-contracts.md"
+            "docs/commands/Command Surface.md"
+            "docs/sprints/Sprint Plan.md"
+          )
+          for f in "${required_docs[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "missing required doc: $f"
+              exit 1
+            fi
+            grep -q "^# " "$f" || { echo "missing title header in $f"; exit 1; }
+            grep -q "^Last updated: " "$f" || { echo "missing Last updated header in $f"; exit 1; }
+            if ! grep -q "^## Purpose" "$f" && ! grep -q "^Purpose: " "$f"; then
+              echo "missing Purpose section/line in $f"
+              exit 1
+            fi
+          done
+          grep -q "docs/DOCUMENTATION_STANDARDS.md" docs/DOCUMENTATION_INDEX.md || {
+            echo "documentation index missing documentation standards link"
+            exit 1
+          }
+          grep -q "docs/contracts/payload-contracts.md" docs/DOCUMENTATION_INDEX.md || {
+            echo "documentation index missing payload contracts link"
+            exit 1
+          }
+          grep -q "docs/commands/Command Surface.md" docs/DOCUMENTATION_INDEX.md || {
+            echo "documentation index missing command surface link"
+            exit 1
+          }
+
+      - name: Contract doc to test-change guard (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.sha }}"
+          changed="$(git diff --name-only "$base_sha...$head_sha")"
+
+          contract_changed=false
+          if echo "$changed" | grep -q "^docs/contracts/payload-contracts.md$"; then
+            contract_changed=true
+          fi
+          if echo "$changed" | grep -q "^docs/commands/Command Surface.md$"; then
+            contract_changed=true
+          fi
+
+          if [ "$contract_changed" = true ]; then
+            if ! echo "$changed" | grep -Eq "(^|/)(test|tests)(/|$)|\\.test\\."; then
+              echo "contract docs changed but no test files changed in this PR"
+              echo "please include unit/integration/e2e coverage updates with contract updates"
+              exit 1
+            fi
+          fi
+
+      - name: Contract doc test-type alignment (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.sha }}"
+          changed="$(git diff --name-only "$base_sha...$head_sha")"
+
+          payload_contract_changed=false
+          command_surface_changed=false
+          if echo "$changed" | grep -q "^docs/contracts/payload-contracts.md$"; then
+            payload_contract_changed=true
+          fi
+          if echo "$changed" | grep -q "^docs/commands/Command Surface.md$"; then
+            command_surface_changed=true
+          fi
+
+          if [ "$payload_contract_changed" = true ]; then
+            # Require at least one Rust test or Rust source test module change.
+            if ! echo "$changed" | grep -Eq "(^|/)crates/.*/src/.*\\.rs$|(^|/)apps/desktop/src-tauri/src/.*\\.rs$"; then
+              echo "payload contracts changed but no Rust-side files changed"
+              echo "expected Rust-side coverage/implementation updates with contract changes"
+              exit 1
+            fi
+          fi
+
+          if [ "$command_surface_changed" = true ]; then
+            # Require at least one JS test change in desktop frontend tests.
+            if ! echo "$changed" | grep -Eq "^apps/desktop/tests/|^apps/desktop/tests-e2e/|\\.test\\.mjs$"; then
+              echo "command surface changed but no frontend test files changed"
+              echo "expected JS unit/e2e coverage updates with command surface changes"
+              exit 1
+            fi
+          fi
+
+      - name: Rust format check
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --workspace
+
+      - name: Rust compile check
+        run: cargo check --workspace
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Frontend lint
+        working-directory: apps/desktop
+        run: npm run lint
+
+      - name: Frontend typecheck
+        working-directory: apps/desktop
+        run: npm run typecheck
+
+      - name: Frontend format check
+        working-directory: apps/desktop
+        run: npm run format:check
+
+      - name: Frontend smoke tests
+        working-directory: apps/desktop
+        run: npm test
+
+      - name: Install Playwright Chromium
+        working-directory: apps/desktop
+        run: npx playwright install --with-deps chromium
+
+      - name: Frontend browser E2E
+        working-directory: apps/desktop
+        run: npm run test:e2e:ci
+
+      - name: Frontend authored export profile E2E
+        working-directory: apps/desktop
+        run: npm run test:e2e:authored:profiles
+
+      - name: Playwright daily metrics summary
+        working-directory: apps/desktop
+        env:
+          GCS_PERF_BUDGET_DASHBOARD_MS: 300
+          GCS_PERF_BUDGET_EDITOR_INIT_MS: 700
+          GCS_PERF_BUDGET_WORKSPACE_ENTER_MS: 1200
+          GCS_PERF_BUDGET_PLAYTEST_FIRST_FRAME_MS: 700
+          GCS_PERF_BUDGET_PLAYTEST_UPDATE_DELAY_MS: 900
+          GCS_PERF_BUDGET_STRICT: 1
+          GCS_PERF_DELTA_WARN_DASHBOARD_MS: 120
+          GCS_PERF_DELTA_WARN_EDITOR_INIT_MS: 180
+          GCS_PERF_DELTA_WARN_WORKSPACE_ENTER_MS: 220
+          GCS_PERF_DELTA_WARN_PLAYTEST_FIRST_FRAME_MS: 180
+          GCS_PERF_DELTA_WARN_PLAYTEST_UPDATE_MS: 220
+        run: npm run test:e2e:metrics
+
+      - name: Upload Playwright results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ github.run_id }}
+          path: |
+            apps/desktop/test-results
+            apps/desktop/playwright-report
+          if-no-files-found: ignore
+
+      - name: Frontend syntax checks
+        run: |
+          node --check apps/desktop/src/app-state.js
+          node --check apps/desktop/src/project-api.js
+          node --check apps/desktop/src/ui-shell.js
+
+  verify-tauri-runtime:
+    runs-on: windows-latest
+    env:
+      CARGO_TARGET_DIR: target-tauri
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Tauri runtime feature compile check
+        run: cargo check -p gcs-desktop --features tauri-runtime
+
+      - name: Tauri runtime invoke smoke
+        shell: pwsh
+        run: |
+          cargo build -p gcs-desktop --features tauri-runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $output = & "target-tauri\debug\gcs-desktop.exe" invoke editor_state '{}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not ($output -match '"entities"')) {
+            Write-Error "invoke smoke output missing expected editor_state payload"
+            exit 1
+          }
+
+      - name: Native export profile smoke (NES/SNES)
+        shell: pwsh
+        run: |
+          $outNes = "target-tauri\ci-export-nes"
+          $outSnes = "target-tauri\ci-export-snes"
+          & "target-tauri\debug\gcs-desktop.exe" export-preview $outNes --profile nes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "target-tauri\debug\gcs-desktop.exe" export-preview $outSnes --profile snes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $metaNesPath = Join-Path $outNes "metadata.json"
+          $metaSnesPath = Join-Path $outSnes "metadata.json"
+          if (-not (Test-Path $metaNesPath)) {
+            Write-Error "missing metadata.json for NES export"
+            exit 1
+          }
+          if (-not (Test-Path $metaSnesPath)) {
+            Write-Error "missing metadata.json for SNES export"
+            exit 1
+          }
+
+          $metaNes = Get-Content $metaNesPath -Raw | ConvertFrom-Json
+          $metaSnes = Get-Content $metaSnesPath -Raw | ConvertFrom-Json
+          if ($metaNes.profile -ne "nes") {
+            Write-Error "unexpected NES profile metadata: $($metaNes.profile)"
+            exit 1
+          }
+          if ($metaSnes.profile -ne "snes") {
+            Write-Error "unexpected SNES profile metadata: $($metaSnes.profile)"
+            exit 1
+          }
+
+      - name: Native export profile parity (NES/SNES)
+        shell: pwsh
+        run: |
+          cd apps/desktop
+          npm run test:e2e:export:nes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run test:e2e:export:snes

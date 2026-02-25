@@ -1,0 +1,1657 @@
+# Changelog
+
+Last updated: 2026-02-19
+
+## Purpose
+- Append-only record of meaningful project, documentation, and tooling changes.
+- Use `docs/sprints/Sprint Plan.md` for active execution state; use this file for historical traceability.
+
+## How To Use This Doc
+1. Read from newest date section downward.
+2. Keep entries concise and reference affected files/commands.
+3. Put policy/process changes in canonical docs and link from here.
+
+## 2026-02-19
+- S5 playtest race-condition hardening (app-state):
+  - `apps/desktop/src/app-state.js` now uses a playtest lifecycle phase state (`idle | running | exiting`) and session counter (`playtestSessionId`) for stale-response protection.
+  - `exitPlaytest` now acts as a hard barrier: increments session, flips phase, and synchronously forces `playtest.active = false` before await.
+  - stale-response guards are now consistently applied pre/post-await for async playtest mutations (`tick`, `keyDown`, `keyUp`, `togglePlayPause`, `stepPlaytestFrame`, `setPlaytestSpeed`).
+- S3-G3 prefab/template runtime slice landed (editor/runtime/api):
+  - added `crates/engine-core/src/prefab.rs` with `EntityPrefab`, `PrefabLibrary`, CRUD/update/list semantics, and unit coverage.
+  - exported prefab module via `crates/engine-core/src/lib.rs`.
+  - wired prefab library into desktop runtime and service/invoke paths:
+    - `apps/desktop/src-tauri/src/editor_runtime.rs`
+    - `apps/desktop/src-tauri/src/editor_service.rs`
+    - `apps/desktop/src-tauri/src/invoke_api.rs`
+  - added invoke commands: `prefab_create`, `prefab_update`, `prefab_list`, `prefab_delete`, `prefab_stamp`.
+  - frontend bridge added in `apps/desktop/src/project-api.js` with fallback support and reset handling for `fallbackEditor.prefabs`.
+  - added frontend and invoke test coverage:
+    - `apps/desktop/tests/project-api.test.mjs`
+    - `apps/desktop/src-tauri/src/invoke_api.rs` dispatch roundtrip tests.
+  - `map_create` now supports optional `prefabId` so prefab-backed entity creation can use the same primary create command path.
+  - added per-entity component override path via `entity_set_components` (runtime/service/invoke/frontend fallback).
+  - prefab library now round-trips through `editor-state.json` on save/open (`prefabs` payload persisted and restored).
+  - runtime now prunes stale per-entity component/script state entries after map undo/redo/delete/reset to prevent orphaned state.
+  - authored export now emits flattened entity component bags under `scenes.json` (`snapshot.entity_components`) so prefab-derived component defaults survive export.
+- Runtime undo/redo state restoration hardening:
+  - `apps/desktop/src-tauri/src/editor_runtime.rs` now archives component/script/state payloads for non-live entities and restores them when entities reappear through undo/redo.
+  - this preserves prefab-derived components and other per-entity runtime data across delete/undo and create/undo/redo cycles while keeping active-entity stores clean.
+  - added regression coverage:
+    - `prefab_entity_components_restore_after_undo_redo_create`
+    - `components_restore_after_delete_undo_for_existing_entity`
+- Component inspector edit path (collision overrides):
+  - `apps/desktop/src/index.html` switched collision section from read-only labels to editable controls (`enabled`, `solid`, `width`, `height`, `offset_x`, `offset_y`) plus save action.
+  - `apps/desktop/src/ui-shell-elements.js` now exposes the new collision input/button/status references.
+  - `apps/desktop/src/app-state.js` added `setSelectedEntityComponents(...)` and wires it to `entity_set_components` API.
+  - `apps/desktop/src/ui-workspace-bootstrap.js` now binds collision form save behavior and persists per-entity collision overrides while preserving other component fields.
+  - added frontend coverage in `apps/desktop/tests/app-state.test.mjs`:
+    - `app-state setSelectedEntityComponents writes per-entity overrides`.
+- Animation hardening follow-up:
+  - corrected animation command docs to match real payload shapes in:
+    - `docs/contracts/payload-contracts.md`
+    - `docs/commands/Command Surface.md`
+  - fixed web WASM animation mapping to write sprite-sheet frame to `entity.components.sprite.frame` instead of `animation.state.current_frame_index` in `apps/desktop/src/project-api.js`.
+  - aligned WASM input one-shot reset behavior with desktop (reset once per tick call, not per simulation step) and removed per-step empty-flag allocation in `crates/gcs-wasm/src/lib.rs`.
+- Web playtest WASM runtime iteration updated:
+  - `crates/gcs-wasm/src/lib.rs` implements playtest-focused movement/physics/camera stepping and JSON snapshot output (`frame`, `steps_taken`, camera + entities).
+- Documentation/contract sync pass:
+  - corrected prefab stamp payload docs to use `prefabId` (not `id`) in:
+    - `docs/contracts/payload-contracts.md`
+    - `docs/commands/Command Surface.md`
+  - updated stale doc audit timestamps and index links:
+    - `docs/DOCUMENTATION_INDEX.md`
+    - `docs/testing/Frontend Smoke Coverage.md`
+    - `docs/reviews/Drift Audit Checklist (Running).md`
+  - cleaned encoding artifacts in contract/testing/review docs to keep rendered markdown stable.
+- Documentation style-hygiene pass:
+  - removed trailing whitespace in multi-doc headers (`Last updated` / metadata lines) for consistent markdown rendering.
+  - fixed one malformed apostrophe in `docs/testing/Manual QA (Running).md`.
+  - normalized template log label formatting in `docs/testing/Manual QA (Running).md` (`- Tester:`).
+
+## 2026-02-18
+- Core UX fixes (map editor + playtest):
+  - Fixed tile painting missing cells during fast drags (`apps/desktop/src/ui-map-interaction.js`): `eventToCanvasPoint` now accepts a `clampToBounds` parameter; the `pointermove` stroke handler passes `clampToBounds=true` so pointer coordinates captured outside the canvas rect are clamped to the nearest edge cell rather than dropped. Added `lostpointercapture` listener to commit any in-progress stroke if the browser drops pointer capture unexpectedly.
+  - Fixed playtest loop lag (`apps/desktop/src/ui-playtest.js`): `requestAnimationFrame(playtestLoop)` is now scheduled **before** `await state.tickPlaytest()`, decoupling the RAF display rate from Tauri IPC latency. Previously the loop ran at ~20fps (IPC-bound); now RAF fires at 60fps with the in-flight guard preventing concurrent ticks.
+
+- S4-EG1: Event Graph MVP:
+  - Added 6 `ScriptNodeBehavior` variants to `crates/script-core/src/graph.rs`: `OnInteract`, `HasItem { item_id }`, `GiveItem { item_id }`, `RemoveItem { item_id }`, `SetEntityState { entity_id, state }`, `ShowMessage { text }`.
+  - Added 4 `ScriptEffect` variants to `crates/script-core/src/runtime.rs`: `GiveItem`, `RemoveItem`, `SetEntityState`, `ShowMessage`. Updated `process_event` signature to accept `inventory: &HashMap<String, u32>` (runtime stays stateless for inventory).
+  - Wired per-entity script graphs and interact events in `apps/desktop/src-tauri/src/editor_runtime.rs`: `entity_script_runtimes`, `entity_script_graphs`, `entity_states` fields; `INTERACT_RANGE_PX=24`; `fire_entity_interact`; applied GiveItem/RemoveItem/SetEntityState/ShowMessage effects.
+  - Added service layer functions and invoke dispatch arms in `editor_service.rs` and `invoke_api.rs`: `entity_attach_graph`, `entity_detach_graph`, `entity_get_graph`, `entity_get_states`. Entity graphs persist in `editor-state.json` and restore on `open_project`.
+  - Created `apps/desktop/src/ui-event-graph.js`: GDevelop-style event sheet list view controller (conditions→actions rows, no canvas drag-drop). Exported `ENTITY_TEMPLATES` with 3 Zelda starter templates.
+  - Added `attachEntityGraph`, `getEntityGraph`, `getEntityStates` to `apps/desktop/src/project-api.js`.
+  - Added Zelda templates (Chest/Door/NPC) to `apps/desktop/src/ui-script-templates.js`.
+  - Wired `EventGraphController` into `apps/desktop/src/ui-workspace-bootstrap.js`.
+  - Added Event Sheet HTML section to `apps/desktop/src/index.html` (above Script Lab in script panel group).
+  - 5 new Rust unit tests in `script-core` (219 total, all pass). 15 new JS tests in `tests/ui-event-graph.test.mjs` (100 total, all pass). 0 typecheck errors, 0 lint warnings.
+
+- S4-SEC1: Security & Stability Hardening:
+  - Fixed `open_project` state bleed (`apps/desktop/src-tauri/src/invoke_api.rs`): corrupt/unreadable `editor-state.json` now resets runtime instead of silently retaining prior session state. Uses `load_authored_state(name, [], [])` as safe fallback.
+  - Fixed export path traversal (`crates/export-core/src/assets.rs`, `lib.rs`): removed unconstrained `resolve_source_path`; `collect_authored_asset_hints` now accepts `project_dir: Option<&Path>` and delegates to `resolve_project_asset_path` — authored asset paths outside the project directory are rejected.
+  - Fixed `innerHTML` XSS (`apps/desktop/src/ui-workspace-bootstrap.js`): all 4 dynamic `innerHTML` assignments (audio binding rows, scene list items) replaced with `createElement`/`textContent`/`dataset` DOM construction. ESLint `no-restricted-properties` warnings: 0.
+  - Fixed deterministic E2E failure (`apps/desktop/tests-e2e/smoke.spec.mjs`): reordered `watch filter chips swap sections` test — entity creation before Script tab switch resolves `entity:created` inspector tab conflict introduced in S4-UX1.
+  - Updated 3 export-core and invoke_api tests to place authored assets inside `project_dir` (required by new confinement policy).
+- S4-UX1: UX Polish Pass:
+  - Toolbar and command buttons now have `title` attributes with keyboard shortcut hints (V/B/E/A/Del/Ctrl+Z/Ctrl+Y/F5).
+  - Added `A` key binding for Add Entity (was missing from keyboard shortcuts).
+  - Canvas empty state upgraded to actionable CTAs: "Add Entity (A)" and "Paint Tile (B)" buttons; auto-hides when map has content or during playtest.
+  - Added `apps/desktop/src/ui-toast.js`: toast/snackbar system with `showToast(message, type, duration)` — types: info/success/warning/error; integrated into save, playtest start, export, and error events.
+  - Entity rename-on-create: inspector tab activates and name input auto-focuses after Add Entity.
+  - Fixed pre-existing bug: inspector name input was showing `projectName` instead of selected entity name.
+  - Added `renameEntity()`/`renameMapEntity()` in `app-state.js`/`project-api.js`; `map_rename` backend command in `invoke_api.rs`, `editor_service.rs`, `editor_runtime.rs`.
+  - Drag-and-drop PNG import: window-level handler → `FileReader` → `import_sprite` Tauri command → `sprite_registry: HashMap<String, String>` on `EditorRuntime`; serialized in every snapshot.
+  - Added `importSprite()` in `project-api.js`/`app-state.js`; `sprite_registry` in `types.js`.
+  - ESLint globals updated: `requestAnimationFrame`, `FileReader`, `Event`, `PointerEvent`, `CustomEvent`.
+  - 3 new frontend tests: `renameEntity` name update, blank-name guard, `importSprite` registry storage.
+- S3-G2: Persistent State Scope (global vs scene-local):
+  - `StateScope` enum (`Global`, `Scene`) added to `script-core` with `#[serde(default)]` backward compatibility.
+  - `SetFlag`, `SetVariable`, `CheckFlag` behaviors carry scope field; existing graphs default to global.
+  - `process_event()` takes separate `global_state` and `scene_state` mutable refs.
+  - `editor_runtime`: added `scene_state` and `scene_states: HashMap<SceneId, ScriptState>`; scene-local state saves on FadeOut and restores on scene entry.
+  - `editor_service` snapshot includes `watch_scene_flags` and `watch_scene_variables`; frontend maps `watchSceneFlags`/`watchSceneVariables` in `app-state.js` and `types.js`.
+  - 4 new Rust scope tests; 214 Rust tests green, 85 frontend tests green.
+
+## 2026-02-16
+- Authored export lane parity (P0):
+  - `save_project` now persists editor state (entities, tiles, project name) to `editor-state.json` alongside `project.json`.
+  - `open_project` loads `editor-state.json` when present and restores entities/tiles into the runtime with clean undo history.
+  - `load_authored_state()` + `serialize_editor_state()` service functions added to `editor_service.rs`.
+  - `reset_undo_history()` added to `EditorRuntime` for clean post-load state.
+  - 2 new Rust tests: save/load roundtrip + component query dispatch.
+- Scene-switching UI:
+  - Left panel "Scenes" section with scene list, add/remove/switch controls.
+  - `app-state.js`: `fetchScenes()`, `addScene()`, `removeScene()`, `switchScene()` methods.
+  - Scene list renders active scene indicator, click-to-switch, and remove buttons.
+  - CSS: `.scene-list`, `.scene-item`, `.scene-select-btn`, `.scene-remove-btn`.
+- Component editing UI:
+  - Inspector panel "Components" section shows CollisionBox, Sprite, Movement, Velocity for selected entity.
+  - `entity_get_components` invoke command + `getEntityComponents()` frontend bridge.
+  - `ComponentsDto`, `CollisionBoxDto`, `SpriteDto` DTOs in `editor_service.rs`.
+  - `fetchSelectedComponents()` auto-triggers on selection change.
+- Script Lab audio routing visual controls:
+  - "Audio Routing" section in Script tab with event picker + clip ID input + binding list.
+  - `addAudioBinding()` / `removeAudioBinding()` state methods.
+  - Manual audio bindings merge with script-graph-inferred bindings at export time (manual wins on conflict).
+  - CSS: `.audio-binding-row`, `.audio-binding-event`, `.audio-binding-clip`, `.audio-binding-remove`.
+- 182 Rust tests, 76 frontend tests, clippy clean, lint clean.
+
+- Documentation cross-reference audit and gap fixes:
+  - Command Surface updated with 12 missing commands (playtest input/physics, scene CRUD, script runtime).
+  - KNOWN_ISSUES RF-11 updated: collision now wired into playtest (was stale).
+  - Review Ledger: added missing RF-10/11/12 entries.
+  - Tool Capability Matrix: added Gameplay Systems section (3 shipped, 9 planned), tile palette picker, export UI panel, project title binding, character generator, structured game database, SFX generator.
+  - Release Checklist: added gameplay validation gates (movement, input, physics, scenes).
+  - Gameplay Roadmap: S2-G1 Slice C marked complete (all 3 modes already wired end-to-end).
+- Project title binding:
+  - `EditorStateResponse` now includes `projectName` from `EditorRuntime`.
+  - `save_project` pushes project name to runtime. Frontend `applyEditorResponse` picks it up.
+  - Fallback editor snapshot includes `projectName`. Canvas header no longer shows hardcoded "Starter Town".
+- Tile palette picker:
+  - 6-color tile palette in view-controls toolbar. Click to select active tile ID (1-6).
+  - Map interaction controller uses selected tile ID instead of hardcoded `1`.
+  - CSS: `.tile-palette` / `.tile-swatch` with active state highlight.
+- Export UI panel:
+  - New "Export" tab in right panel with profile selector, debug toggle, and export button.
+  - Wired to existing `exportPreview` state action. Status feedback on success/failure.
+- 180 Rust tests, 76 frontend tests, clippy clean, lint clean.
+
+- Completed Phase 1 gameplay systems (S2-G0 through S2-G3):
+  - **S2-G0 Tile Properties**: `TileProperties` (solid flag) + `TilePropertyRegistry` in `engine-core::map_editor`. All tiles default solid (retro convention). `would_collide_with_tiles()` in `collision.rs` filters by solid flag. 5 new tests.
+  - **S2-G1 Movement System**: `engine-core::movement` module with 3 modes: `GridSnap` (Zelda/Tetris), `FreeMove` (Mario), `TurnBased` (FF). `MovementComponent`, `MovementInput`, `FacingDirection`, step cooldown + interval. Wired into `editor_runtime::tick_playtest()` with full collision checking (entity + tile). 8 new movement unit tests + 4 integration tests.
+  - **S2-G3 Input Action Mapping**: `engine-core::input` module with `InputAction` enum (8 actions), `KeyCode`, `InputMapping` (profile defaults), `InputState` (held/just_pressed/just_released tracking). `to_movement_input()` converts held keys to movement vector. `playtest_key_down`/`playtest_key_up` on `EditorRuntime`. 7 new tests.
+  - **S2-G3 Slice B**: `playtest_key_down` / `playtest_key_up` invoke commands + `playtestKeyDown()` / `playtestKeyUp()` frontend bridge. `set_physics_config` invoke command + `setPhysicsConfig()` frontend bridge. 2 new invoke dispatch tests.
+  - **S2-G3 Slice C**: Input actions (ActionA/B, Start, Select) fire script events (`action_a`, `action_b`, `start`, `select`) during playtest tick. Movement keys excluded. 2 new integration tests.
+  - **S2-G2 Velocity/Physics**: `engine-core::physics` module with `VelocityComponent`, `PhysicsConfig` (gravity, friction), `physics_step()`. Top-down (no gravity) and platformer presets. 7 new unit tests.
+  - **S2-G2 Slice B-C**: Physics wired into `tick_playtest()` — gravity, friction, collision response. `PhysicsConfig` field on `EditorRuntime` with setter/getter. Input forces feed velocity for FreeMove entities. 3 new integration tests.
+  - `ComponentStore` extended with movement + velocity accessors + `entities_with_velocity()`.
+  - 180 Rust tests green, clippy clean.
+
+- Added Gameplay Systems Integration Roadmap:
+  - created `docs/roadmap/Gameplay Systems Integration Roadmap.md` mapping 12 gameplay systems to architecture locations, sprint placement, and implementation slices.
+  - systems: movement (3 modes), velocity/physics, input action mapping, camera following, persistent state scoping, prefab/templates, runtime spawning, animation state machines, HUD layer, viewport gizmos, live play editing, timeline/sequencer.
+  - organized into 4 phases across Sprints 2-5, totaling ~35 implementation slices.
+  - updated Sprint Plan with cross-sprint gameplay systems section and execution queue.
+  - updated KNOWN_ISSUES with gameplay systems integration follow-up (RF-2026-02-16-12).
+
+- Modularized export-core crate (P1-2):
+  - split monolithic `lib.rs` (2,254 lines) into 5 focused modules:
+    - `types.rs` (~110 lines): public export data types (ExportProfile, ExportOptions, ExportBundleReport, scene/tile/entity/playtest types).
+    - `input.rs` (~85 lines): internal JSON deserialization types (InputEditorState, InputEntity, InputTile, InputAudioClip, etc.).
+    - `scenes.rs` (~475 lines): default preview scene generation (`default_preview_scenes()`).
+    - `assets.rs` (~590 lines): asset discovery, inference, writing, starter SVG generation, path utilities, audio binding collection.
+    - `lib.rs` (~200 lines facade + ~640 lines tests): public API functions, template handling, re-exports.
+  - zero behavioral changes — all 142 Rust tests pass, clippy clean, public API unchanged.
+- Added CI quality gates with clippy enforcement (P1-1):
+  - fixed 4 clippy warnings across workspace:
+    - `command-core`: `or_insert_with(CommandStack::default)` → `or_default()`.
+    - `project-core`: suppressed `wrong_self_convention` on `MigrationStep::from_version()` trait method.
+    - `export-core`: `matches!(tile_id, 1 | 2 | 3)` → `matches!(tile_id, 1..=3)`.
+    - `engine-core` test: suppressed `field_reassign_with_default` (field is private, can't use struct init).
+  - added `cargo clippy --workspace --all-targets -- -D warnings` step to `.github/workflows/ci.yml`.
+  - upgraded CI `cargo test` and `cargo check` to `--workspace` for full crate coverage.
+  - validated: clippy clean, 142 Rust tests green.
+- Added collision detection and entity component system baseline (P0-3):
+  - created `crates/engine-core/src/components.rs`:
+    - `CollisionBox`: axis-aligned bounding box with offset, width/height, solid flag, builder pattern.
+    - `SpriteComponent`: visual representation reference (asset_id, frame).
+    - `EntityComponents`: component bag struct with optional collision and sprite fields.
+    - `ComponentStore`: HashMap-backed store mapping EntityId to EntityComponents with typed accessors.
+    - 4 unit tests covering builder, CRUD, serialization roundtrip, and empty-field skipping.
+  - created `crates/engine-core/src/collision.rs`:
+    - `Aabb`: world-space axis-aligned bounding box with overlap and point-containment checks.
+    - `entity_aabb()`: compute world-space AABB from entity position + collision box offset.
+    - `check_entity_collisions()`: find all overlapping entity pairs from entities + component store.
+    - `check_tile_collisions()`: find tile coordinates overlapped by an entity's collision box.
+    - `would_collide_with_entities()`: predict solid collisions at a new position (for movement blocking).
+    - non-solid entities are detected in pairs but don't block movement (trigger zones).
+    - 8 unit tests covering AABB math, entity pairs, tile overlap, movement prediction, and non-solid behavior.
+  - exported all public types from `engine-core::lib.rs`.
+  - validated with: `cargo test --workspace` (142 passed, 0 failed across all crates).
+- Implemented scene/level system with multi-scene model, spawn points, and transitions (P0-2):
+  - created `crates/engine-core/src/scene.rs` with:
+    - `SceneId` type alias (String), `SpawnPoint` struct (name, position).
+    - `Scene` struct (id, name, entities, tiles, spawn_points) with `add_spawn_point()` and `resolve_spawn_position()`.
+    - `SceneCollection` (HashMap of scenes with active scene tracking, CRUD ops, sorted listing).
+    - 10 unit tests covering creation, spawn resolution, collection CRUD, active scene switching.
+  - wired scene system into `EditorRuntime`:
+    - added `scene_collection: SceneCollection` and `active_playtest_scene: Option<SceneId>` fields.
+    - added scene management methods: `add_scene()`, `remove_scene()`, `set_active_scene()`, `transition_to_scene()`, `scene_collection()`, `scene_collection_mut()`.
+    - `apply_script_effects()` ChangeScene handler now performs actual scene transitions when target scene exists, with graceful fallback logging when scene not found.
+    - `enter_playtest()` initializes `active_playtest_scene` from collection's active scene.
+    - `exit_playtest()` clears `active_playtest_scene`.
+    - added 8 scene integration tests in `editor_runtime::tests`.
+  - added invoke API commands for scene management:
+    - `scene_add`: adds a scene with id and name.
+    - `scene_remove`: removes a scene by id.
+    - `scene_set_active`: switches the active editor scene.
+    - `scene_list`: returns all scenes with metadata.
+    - `scene_add_spawn_point`: adds a spawn point to a specific scene.
+    - added `SceneDto`, `SpawnPointDto`, `SceneListResponse` DTOs to `editor_service`.
+    - added `scene_add_list_set_active_remove_dispatch_roundtrip` integration test.
+  - frontend bridge: added `addScene()`, `removeScene()`, `setActiveScene()`, `listScenes()`, `addSpawnPoint()` to `project-api.js`.
+    - fallback state tracks `scenes` array and `activeSceneId`.
+    - `fallbackSceneList()` returns scene list response shape.
+  - updated `types.js` with `SceneDto`, `SceneListResponse`, and scene payload typedefs.
+  - validated with:
+    - `cargo test --workspace` (130 passed, 0 failed across all crates)
+    - `node --test tests/*.test.mjs` (76 passed, 0 failed)
+- Added invoke API commands and frontend bridge for script graph execution (P0-1 Slice C):
+  - added `script_load_graph` invoke command: validates graph, compiles into `ScriptRuntime`, returns registered event names + editor state.
+  - added `script_unload_graph` invoke command: clears loaded graph and resets script state.
+  - added `script_fire_event` invoke command: dispatches named event, returns effects count + visited nodes + editor state.
+  - added `ScriptLoadResponse` and `ScriptFireEventResponse` DTOs to `editor_service`.
+  - added `script_loaded` field to `EditorStateResponse` for frontend graph-loaded awareness.
+  - `load_script_graph` rejects invalid graphs with validation error count.
+  - frontend bridge: added `loadScriptGraph()`, `unloadScriptGraph()`, `fireScriptEvent()` to `project-api.js`.
+  - updated fallback state and `editorSnapshot()` with `script_loaded` and `script_event` breakpoint.
+  - updated `types.js` `EditorStateResponse` typedef with `script_loaded`.
+  - added 2 invoke API tests:
+    - `script_load_fire_unload_dispatch_roundtrip`
+    - `script_load_rejects_invalid_graph`
+  - validated with:
+    - `cargo test` (111 passed, 0 failed across all crates)
+    - `cd apps/desktop && npm test` (76 passed, 0 failed)
+    - `cd apps/desktop && npm run lint` (clean)
+- Wired script runtime into editor_runtime for playtest execution (P0-1 Slice B):
+  - added `script_runtime: Option<ScriptRuntime>` and `script_state: ScriptState` fields to `EditorRuntime`.
+  - added `load_script_graph()`: compiles a `ScriptGraph` into an executable `ScriptRuntime`, returns registered event names.
+  - added `unload_script_graph()`: clears loaded graph and resets script state.
+  - added `fire_script_event(event_name)`: dispatches a named event through the loaded script graph, applies effects:
+    - `SetFlag` / `SetVariable` effects update `core_watch_flags` / `core_watch_variables`.
+    - `ChangeScene` effects emit trace + trigger `script_event` breakpoint.
+    - `PlayAudio` / `LogMessage` effects emit playtest trace entries.
+  - `tick_playtest()` now fires `playtest_tick` event through loaded script graph each tick.
+  - `enter_playtest()` and `exit_playtest()` reset `script_state` for clean session isolation.
+  - added `script_event` to default breakpoints for breakpoint-on-script-action debugging.
+  - added 9 integration tests:
+    - `script_load_and_fire_event_sets_watch_flag`
+    - `script_fire_event_without_graph_is_noop`
+    - `script_unload_clears_graph_and_state`
+    - `script_state_resets_on_enter_playtest`
+    - `script_state_resets_on_exit_playtest`
+    - `script_tick_event_fires_during_playtest_tick`
+    - `script_effects_appear_in_playtest_trace`
+    - `script_scene_change_triggers_breakpoint`
+    - `script_breakpoint_default_is_registered`
+  - validated with:
+    - `cargo test` (109 passed, 0 failed across all crates)
+- Implemented script runtime execution bridge (P0-1 Slice A):
+  - split `crates/script-core/src/lib.rs` into `graph.rs` (validation) and `runtime.rs` (execution).
+  - extended `ScriptNode` with optional `behavior` field (`ScriptNodeBehavior` enum):
+    - `OnEvent`: triggers on named gameplay events.
+    - `CheckFlag`: evaluates a boolean flag for condition branching.
+    - `SetFlag`: sets a boolean flag in script state.
+    - `SetVariable`: sets an integer variable in script state.
+    - `ChangeScene`: emits a scene transition effect.
+    - `PlayAudio`: emits an audio playback effect.
+    - `LogMessage`: emits a trace log effect.
+  - extended `ScriptEdge` with optional `label` field for condition branch routing ("true"/"false").
+  - added `ScriptState` (flags + variables map) for persistent per-session script state.
+  - added `ScriptRuntime::compile()` to build indexed lookup tables from validated graphs.
+  - added `ScriptRuntime::process_event()` for deterministic event-driven graph traversal:
+    - finds event trigger nodes by name, traverses downstream edges.
+    - evaluates condition nodes and follows labeled branch edges.
+    - executes action nodes and collects `ScriptEffect` results.
+    - state mutations (SetFlag/SetVariable) apply immediately for downstream visibility.
+    - traversal depth limited to 256 nodes per event to prevent runaway.
+  - added `ScriptEffect` enum for caller-applied side effects (ChangeScene, PlayAudio, etc).
+  - all new types are backward-compatible: `behavior` and `label` fields are `Option` with `#[serde(default)]`.
+  - added 20 unit tests covering: simple event-to-action, condition branching (true/false), intra-event
+    flag propagation, chained actions, multiple listeners, scene change, variable set, audio play,
+    empty graph safety, no-behavior passthrough, backward-compatible deserialization.
+  - validated with:
+    - `cargo test -p script-core` (20 passed)
+    - `cargo test` (100 passed, 0 failed across all crates)
+- Added shared dashboard config + recents utility modules:
+  - new `apps/desktop/src/ui-dashboard-config.js` for dashboard constants (`UI_PROFILE_STORAGE_KEY`,
+    `DASHBOARD_RECENT_STORAGE_KEY`, `MAX_RECENT_PROJECTS`).
+  - new `apps/desktop/src/ui-dashboard-recents.js` with pure helpers:
+    - `normalizeRecentProjects(...)`
+    - `parseRecentProjects(...)`
+  - `apps/desktop/src/ui-launch-dashboard.js` now uses shared recents/config helpers instead of
+    inlined parsing logic.
+- Added fast unit coverage for recents normalization:
+  - new test file `apps/desktop/tests/ui-dashboard-recents.test.mjs`.
+  - verifies malformed-entry filtering, recency sorting, cap behavior, invalid JSON, and non-array payload handling.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Externalized dashboard template metadata into a shared module:
+  - added `apps/desktop/src/ui-dashboard-templates.js` as the single source for launch template IDs/labels/metadata.
+  - `apps/desktop/src/ui-launch-dashboard.js` now imports catalog/default from the shared module.
+  - keeps template content updates data-only and avoids controller constant drift.
+- Strengthened dashboard recent-project stress coverage:
+  - updated `apps/desktop/tests-e2e/smoke.spec.mjs` recents test to seed 120 entries plus malformed records.
+  - validates filtering of invalid rows, recency ordering, and cap behavior remain stable under larger input.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Consolidated launch template definitions to a single data-driven source:
+  - expanded `DASHBOARD_TEMPLATE_CATALOG` in `apps/desktop/src/ui-launch-dashboard.js` with explicit
+    `selectLabel` and `difficulty` fields.
+  - template select labels and dashboard cards are now generated from catalog metadata (no duplicated
+    template text branches).
+  - removed static template/options markup from `apps/desktop/src/index.html` so dashboard/editor
+    template surfaces hydrate from controller data only.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Added smoke coverage for playtest exit discoverability:
+  - `apps/desktop/tests-e2e/smoke.spec.mjs` now asserts Playtest overlay shows `Press Esc to exit`.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+- Implemented playtest exit discoverability polish:
+  - added persistent overlay hint in `apps/desktop/src/index.html`:
+    - `Press Esc to exit` now appears in Playtest Mode controls.
+  - added matching hint styling in `apps/desktop/src/styles.css` using existing text-token palette.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Implemented UI/UX Slice C accessibility and legibility hardening pass:
+  - updated live-region semantics in `apps/desktop/src/index.html`:
+    - added `aria-live="polite"` to dashboard/workspace status surfaces (`dashboard-status`, `health-summary`, `onboarding-status`, `walkthrough-status`, `issues-list`, `log-lines`).
+  - strengthened keyboard focus visibility and small-text readability in `apps/desktop/src/styles.css`:
+    - expanded `:focus-visible` ring coverage to `button`, `select`, `input`, `textarea`, and `[role="tab"]`.
+    - increased small helper/status text sizes for onboarding/walkthrough/workflow hints.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Implemented UI/UX Slice B beginner progressive-disclosure pass (workspace simplification):
+  - updated workspace rail in `apps/desktop/src/index.html`:
+    - moved non-essential lanes (`Story Maker`, `Animation Lab`, `Audio`) behind `profile-advanced`.
+    - added beginner-oriented `workspace-note` guidance in the workspace card.
+  - reduced beginner cognitive load in Quick Start:
+    - wrapped Assisted Content controls in `profile-advanced` while keeping Guided Walkthrough visible.
+  - refined beginner right-panel navigation in `apps/desktop/src/styles.css`:
+    - beginner tab layout now uses two columns for clearer `Inspector`/`Issues` focus.
+    - added `workspace-note` styling for concise in-context guidance.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Implemented UI/UX Slice A dashboard readability pass (layout + hierarchy polish, selector-stable):
+  - updated launch dashboard structure in `apps/desktop/src/index.html`:
+    - added `launch-kicker` metadata line.
+    - promoted primary CTA to `Create Project` (`#dashboard-action-new` unchanged).
+    - grouped secondary actions (`Open Project`, `Continue Recent`, `Recover Backup`) while preserving existing IDs.
+    - enriched template cards with beginner/intermediate metadata labels (kept `data-dashboard-template` contract).
+  - updated launch dashboard styling in `apps/desktop/src/styles.css`:
+    - improved heading scale, spacing rhythm, form-label readability, and recent-list hierarchy.
+    - added dedicated primary-action treatment and responsive dashboard action layout behavior.
+    - added focus-visible styles for dashboard action and template cards.
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cd apps/desktop && npm run test:e2e:visual`
+- Added a consolidated UI/UX implementation playbook and synced delivery docs:
+  - new doc: `docs/frontend/UI UX Execution Plan.md`
+  - includes prioritized UX COA (P0/P1/P2), mockup adopt/adjust/defer decisions, required validation gates, and Definition of Done for UX slices.
+  - synced references in:
+    - `docs/frontend/Visual Design System.md`
+    - `docs/DOCUMENTATION_INDEX.md`
+    - `docs/DEVELOPMENT_WORKFLOW.md`
+    - `docs/RELEASE_CHECKLIST.md`
+    - `docs/sprints/Sprint Plan.md`
+- Hardened launch-dashboard recent-project behavior and stabilized smoke selectors:
+  - added dashboard recent-project rendering surface in `apps/desktop/src/index.html` and corresponding styling in `apps/desktop/src/styles.css`.
+  - wired recents through shell/bootstrap collection (`apps/desktop/src/ui-shell-elements.js`, `apps/desktop/src/ui-shell.js`) into `apps/desktop/src/ui-launch-dashboard.js`.
+  - implemented recent-project persistence/open flow with:
+    - local-storage key `gcs.dashboard.recent_projects.v1`
+    - recency ordering by `updatedAt`
+    - bounded list cap (`MAX_RECENT_PROJECTS = 8`)
+    - continue-from-dashboard open-latest behavior.
+  - stabilized smoke selectors to use `#dashboard-action-open` and avoid role-name ambiguity from new "Open recent project ..." controls.
+  - added smoke regression coverage:
+    - `dashboard recent projects list can reopen a recent project`
+    - `dashboard recent projects list is recency-sorted and capped`
+  - validated with:
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+    - `cargo test -p project-core`
+- Expanded visual-regression breadth to include responsive breakpoint baselines:
+  - extended `apps/desktop/tests-e2e/visual-shell.spec.mjs` with responsive `@visual` coverage for:
+    - mid-width (`1100x900`) light+compact canvas/right-panel readability
+    - narrow-width (`800x900`) high-contrast+compact topbar actions/tab legibility
+  - added snapshot baselines:
+    - `canvas-midwidth-light-compact-chromium-win32.png`
+    - `right-panel-midwidth-light-compact-chromium-win32.png`
+    - `topbar-actions-narrow-high-contrast-compact-chromium-win32.png`
+    - `right-tabs-narrow-high-contrast-compact-chromium-win32.png`
+  - validated with:
+    - `cd apps/desktop && npm run test:e2e:visual`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+- Expanded visual-regression coverage for Phase C theme/density rollout:
+  - extended `apps/desktop/tests-e2e/visual-shell.spec.mjs` with new visual baselines for:
+    - light theme + compact density (`topbar-light-compact`, `canvas-light-compact`)
+    - high-contrast theme + compact density issue readability (`issues-drawer-high-contrast-compact`)
+  - refreshed visual snapshots under:
+    - `apps/desktop/tests-e2e/visual-shell.spec.mjs-snapshots/`
+  - validated with:
+    - `cd apps/desktop && npm run test:e2e:visual`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+- Shipped Phase C runtime preferences wiring for visual controls:
+  - editor topbar `Theme` and `Density` controls are now fully wired through shell element collection, workspace bootstrap, and preferences controller state/persistence.
+  - preferences now persist and apply `data-ui-profile`, `data-theme`, and `data-density` attributes on `document.body`.
+  - added light/high-contrast theme token overrides and compact density layout overrides in `apps/desktop/src/styles.css`.
+  - added/updated tests:
+    - `apps/desktop/tests/ui-preferences.test.mjs` (new)
+    - `apps/desktop/tests/ui-shell-elements.test.mjs`
+    - `apps/desktop/tests/ui-shell-bootstrap-elements.test.mjs`
+    - `apps/desktop/tests/ui-workspace-bootstrap.test.mjs`
+    - `apps/desktop/tests-e2e/smoke.spec.mjs` (new theme/density persistence smoke case)
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke`
+- Completed full visual design audit and selected best course of action:
+  - added `docs/reviews/Visual Design Audit 2026-02-16.md` covering:
+    - current shell/CSS visual quality and UX findings
+    - original design-spec vs active visual-system drift analysis
+    - external mockup intake (Gemini/Grok) with reuse/reject guidance
+    - recommended COA: incremental performance-first convergence in current modular shell
+  - synced follow-up tracking and execution docs:
+    - `docs/reviews/Project Review Ledger (Running).md` (new review entry + `RF-2026-02-16-09`)
+    - `docs/KNOWN_ISSUES.md` (theme/density + visual-direction follow-ups)
+    - `docs/sprints/Sprint Plan.md` (visual COA execution task)
+    - `docs/DOCUMENTATION_INDEX.md` (new audit doc index link)
+- Ingested external Grok/Gemini review inputs into canonical review tracking and issue priorities:
+  - updated `docs/reviews/Project Review Ledger (Running).md` with:
+    - external Gemini risk intake summary
+    - external Grok doc/UX intake summary
+    - visual mockup intake notes (Gemini React + Grok HTML/CSS)
+    - consolidated P0/P1/P2 priority queue and new follow-up IDs (`RF-2026-02-16-04` through `RF-2026-02-16-08`)
+  - updated `docs/KNOWN_ISSUES.md` review follow-ups with explicit P0/P1 items tied to ledger IDs.
+  - updated `docs/sprints/Sprint Plan.md` immediate-next-task queue with aligned execution priorities (authored export parity, script runtime bridge, dashboard scalability, visual consistency lock).
+- Synced and consolidated core documentation status surfaces to reduce drift:
+  - updated visual/dashboard planning docs to align phase statuses with shipped work and active tasks:
+    - `docs/frontend/Visual Design System.md`
+    - `docs/frontend/Launch Dashboard and Entry Flow.md`
+    - `docs/frontend/Type Safety Plan.md`
+  - updated sprint header/status wording to reflect current phase completion state:
+    - `docs/sprints/Sprint Plan.md`
+  - tightened documentation governance and canonical-source references:
+    - `docs/DOCUMENTATION_INDEX.md`
+    - `docs/DOCUMENTATION_STANDARDS.md`
+  - refreshed testing docs with current gate expectations and remaining limitations:
+    - `docs/testing/Playwright Bootstrap Plan.md`
+    - `docs/testing/QA Checklist.md`
+    - `docs/testing/Viewport Visual Assertion Strategy.md`
+  - retained one-source-of-truth model:
+    - execution status: `docs/sprints/Sprint Plan.md`
+    - open issues: `docs/KNOWN_ISSUES.md`
+    - history: `docs/CHANGELOG.md`
+- Consolidated review documentation into a single running ledger:
+  - added canonical review tracker: `docs/reviews/Project Review Ledger (Running).md`
+  - marked older review snapshots as archived references and added cross-links:
+    - `docs/reviews/Claude Review Action Plan.md`
+    - `docs/reviews/Documentation Readability Audit 2026-02-15.md`
+    - `docs/reviews/Drift Audit Checklist (Running).md` (remains operational checklist)
+  - updated review navigation in `docs/DOCUMENTATION_INDEX.md`.
+
+## 2026-02-15
+- Added Script Lab -> export gameplay-audio binding bridge in app-state:
+  - `app-state.exportPreview()` now forwards composed `editorState` hints (`entities`, `tiles`, `playtest.frame`) plus script-derived audio routing.
+  - added script graph extraction for export audio routing:
+    - explicit graph metadata: `audioBindings` / `audioEvents[]`
+    - inferred mapping from audio action nodes (`audioId`/`clip`) by tracing upstream event nodes
+  - app-state now emits `editorState.audioBindings` + `editorState.audioEvents` to native export invoke payload when available.
+  - added frontend regression test:
+    - `apps/desktop/tests/app-state.test.mjs` (`app-state export preview forwards script-derived audio bindings`)
+  - touched files:
+    - `apps/desktop/src/app-state.js`
+    - `apps/desktop/tests/app-state.test.mjs`
+    - `docs/commands/Command Surface.md`
+
+- Added authored gameplay-audio binding hooks in export runtime:
+  - `export-core` now emits normalized authored audio bindings into `metadata.json` (`audio_bindings`) from optional:
+    - `editorState.audioBindings` / `editorState.audio_bindings`
+    - `editorState.audioEvents[]` / `editorState.audio_events[]` (`event`, `audioId`)
+  - shared export runtime now loads `metadata.json` and exposes gameplay-audio bridge methods:
+    - `getAudioBindings()`
+    - `setAudioBindings(bindings)`
+    - `triggerGameplayEventAudio(eventName, options)`
+  - runtime gameplay trigger resolution order:
+    1. authored metadata binding (`audio_bindings[event]`)
+    2. direct `audio_${event}` match
+    3. built-in alias fallback (for common events like `item_pickup`, `quest_state`, `ui_open`)
+  - `Sample Game 01` now includes authored `audioBindings` + `audioEvents` in native export payload.
+  - authored-export Playwright E2E now asserts:
+    - `metadata.json` includes authored `audio_bindings`
+    - runtime bridge exposes gameplay-audio hooks
+    - triggering `item_pickup` emits playback telemetry with `source: gameplay:item_pickup`
+  - touched files:
+    - `crates/export-core/templates/runtime.js`
+    - `crates/export-core/src/lib.rs`
+    - `apps/desktop/scripts/build-sample-game-01.mjs`
+    - `apps/desktop/tests-e2e/authored-export.spec.mjs`
+    - `apps/desktop/src/types.js`
+
+- Added authored-export runtime audio bridge and sample coverage:
+  - shared export runtime template now builds an audio catalog from `audio_clip` assets and exposes bridge helpers:
+    - `getLoadedAudioCount()`
+    - `listAudioIds()`
+    - `hasAudioAsset(id)`
+    - `playAudioById(id, options)`
+    - `stopAudioById(id)`
+    - `getAudioPlaybackEvents()`
+    - `getAudioPlaybackEventCount()`
+  - movement input in export runtime now triggers deterministic audio-play attempts (prefers `audio_step` / `audio_move` / `audio_footstep`, falls back to first available clip).
+  - frontend export API now forwards optional authored `editorState` payload hints to invoke export (`export_preview_html5`) so callers can explicitly provide entity/tile/audio state at export time.
+  - `Sample Game 01` dogfood builder now generates a deterministic local WAV clip and includes authored audio export hints.
+  - sample builder now emits a small authored audio set (`theme`, `step`, `pickup`) for runtime trigger and telemetry verification.
+  - authored-export Playwright E2E now asserts:
+    - `audio_clip` presence in `assets/manifest.json`
+    - packaged audio file fetchability
+    - runtime audio bridge availability, loaded-audio count, and movement-triggered playback telemetry events
+  - touched files:
+    - `crates/export-core/templates/runtime.js`
+    - `crates/export-core/src/lib.rs`
+    - `apps/desktop/scripts/build-sample-game-01.mjs`
+    - `apps/desktop/tests-e2e/authored-export.spec.mjs`
+  - validated with:
+    - `cargo test -p export-core`
+    - `cargo test -p gcs-desktop --bin gcs-desktop`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run build:sample:game01`
+    - `cd apps/desktop && npm run test:e2e:authored`
+
+- Added authored-export audio ingest/copy baseline in native export lane:
+  - `export-core` now accepts authored audio hints from `editorState.audio[]` / `editorState.audioClips[]` (`assetPath`), packages copied clips under `assets/audio/*`, and emits `audio_clip` entries in `assets/manifest.json`.
+  - `projectDir/assets/manifest.json` now supports audio mappings via:
+    - `audio` map keys, and
+    - `assets[]` entries where `id` is `audio_*` or `kind` is `"audio"`.
+  - audio packaging from project manifest is scoped to authored audio IDs referenced in `editorState.audio*` (no manifest-wide audio copy).
+  - added regression tests:
+    - `crates/export-core/src/lib.rs` (`authored_audio_asset_paths_are_copied_into_export_when_present`, `project_manifest_audio_assets_are_packaged_in_authored_export`)
+    - `apps/desktop/src-tauri/src/invoke_api.rs` (`export_preview_dispatch_packages_project_manifest_audio_assets`)
+  - validated with:
+    - `cargo fmt`
+    - `cargo test -p export-core`
+    - `cargo test -p gcs-desktop --bin gcs-desktop`
+    - `cd apps/desktop && npm test`
+
+- Added authored-export starter asset fallback bundle in `export-core`:
+  - authored export inference now resolves known starter IDs to bundled starter assets under `assets/starter/*.svg` before falling back to generated placeholders.
+  - starter sources are now explicit in manifest entries (`starter_pack://tiles/...`, `starter_pack://entities/...`).
+  - updated inferred asset regression coverage in `crates/export-core/src/lib.rs` to assert starter source/path behavior for `tile_1` and `entity_player`.
+  - expanded browser authored-export E2E (`apps/desktop/tests-e2e/authored-export.spec.mjs`) to assert starter-pack source/path presence and starter asset fetchability from packaged artifacts.
+  - validated with:
+    - `cargo test -p export-core`
+    - `cargo test -p gcs-desktop --bin gcs-desktop`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run build:sample:game01`
+    - `cd apps/desktop && npm run test:e2e:authored`
+
+- Added starter-silhouette quick presets and export-lane UX clarity:
+  - Draw Studio seed panel now includes quick silhouette buttons (`Tree`, `Bush`, `Rock`) ahead of layout presets while preserving compatibility with existing `Cluster`/`Line`/`Ring` actions.
+  - Draw Seed default fallback preset now resolves to `tree` instead of `cluster`.
+  - editor walkthrough panel now surfaces export-lane guidance copy (authored editor lane vs canonical CLI/CI parity lane).
+  - export preview log lines now include explicit lane labels (`desktop authored lane`, `web fallback lane`).
+  - touched files:
+    - `apps/desktop/src/index.html`
+    - `apps/desktop/src/styles.css`
+    - `apps/desktop/src/ui-draw-assist-controls.js`
+    - `apps/desktop/src/ui-draw-seed.js`
+    - `apps/desktop/src/ui-shell-elements.js`
+    - `apps/desktop/src/ui-shell-bootstrap-elements.js`
+    - `apps/desktop/src/ui-workspace-bootstrap.js`
+    - `apps/desktop/src/ui-shell-events.js`
+    - `apps/desktop/src/ui-walkthrough.js`
+    - `apps/desktop/tests/ui-shell-events.test.mjs`
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Promoted frontend typecheck from scoped module list to full-source coverage:
+  - `apps/desktop/jsconfig.json` now uses `include: ["src/**/*.js"]`.
+  - fixed full-source typecheck blockers in:
+    - `apps/desktop/src/export-preview-runtime.js` (typed `window.__exportPreview` bridge)
+    - `apps/desktop/src/ui-perf-metrics.js` (typed `window.__gcsPerfMetrics` bridge)
+    - `apps/desktop/src/ui-workspace-bootstrap.js` (bootstrap element and callback contract alignment)
+    - `apps/desktop/src/ui-launch-dashboard.js` (state port async return contract widening)
+    - `apps/desktop/src/ui-shell.js` (typed composition boundary casts for select/button dependencies and launch dashboard state adapter)
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-preferences`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-preferences.js`.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-command-bar` and `ui-editor-input`:
+  - `apps/desktop/jsconfig.json` now includes:
+    - `src/ui-command-bar.js`
+    - `src/ui-editor-input.js`
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-breakpoints`, `ui-debug-helpers`, and `ui-shell-bootstrap-elements`:
+  - `apps/desktop/jsconfig.json` now includes:
+    - `src/ui-breakpoints.js`
+    - `src/ui-debug-helpers.js`
+    - `src/ui-shell-bootstrap-elements.js`
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-shell-elements`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-shell-elements.js`.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-shell-lifecycle`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-shell-lifecycle.js`.
+  - `apps/desktop/src/ui-shell-lifecycle.js` now uses an explicit typed window extension for the global error-boundary install flag (`__gcsGlobalErrorBoundaryInstalled`) under checked JS mode.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-shell-render` and `ui-workspace-bindings`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-shell-render.js` and `src/ui-workspace-bindings.js`.
+  - aligned assisted-guardrail callback contracts in:
+    - `apps/desktop/src/ui-shell-render.js`
+    - `apps/desktop/src/ui-workspace-bootstrap.js`
+    so `resolveAssistedGuardrail(...)` returns the shared `AssistedGuardrail` shape used by health/issue rendering.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-shell-events`, `ui-shell-status`, and `ui-shell-log`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-shell-events.js`, `src/ui-shell-status.js`, and `src/ui-shell-log.js`.
+  - `apps/desktop/src/ui-shell-events.js` now documents a typed event payload contract for assisted-generation metadata (`primitiveKind`, `primitiveProfile`, `removedCount`) used by shell logs.
+  - `apps/desktop/src/ui-shell-status.js` now uses explicit button-element contracts (`HTMLButtonElement`) for `.disabled` status updates under checked JS mode.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-shell-runtime`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-shell-runtime.js`.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-shell-module-bundle`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-shell-module-bundle.js`.
+  - `apps/desktop/src/ui-shell-module-bundle.js` now exposes typed tuple return contracts for editor module loading.
+  - `apps/desktop/src/ui-workspace-bootstrap.js` now reuses bundle tuple typedef from `ui-shell-module-bundle.js` to avoid duplicated contract drift.
+  - `apps/desktop/src/ui-draw-seed.js` preset import warning parsing now uses explicit schema guard typing for checked property access.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage to `ui-workspace-bootstrap`:
+  - `apps/desktop/jsconfig.json` now includes `src/ui-workspace-bootstrap.js`.
+  - `apps/desktop/src/ui-workspace-bootstrap.js` now declares typed module-bundle tuple contracts for dynamic import wiring and aligns bootstrap dependency contracts with workspace binding usage.
+  - added explicit select/input element casts in bootstrap wiring for checked DOM typing.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+    - `cd apps/desktop && npm run test:e2e:smoke:quickstart`
+
+- Expanded scoped frontend typecheck coverage to `app-state`:
+  - `apps/desktop/jsconfig.json` now includes `src/app-state.js`.
+  - added new shared typedef contracts in `apps/desktop/src/types.js` for open/save/health/script validation response shapes.
+  - `apps/desktop/src/app-state.js` now applies typed response casts for project open/save/health/script-validate/export paths, reducing unknown-response drift.
+  - `generatePrimitiveAsset` point coercion now uses numeric conversion (`Number(...)`) instead of `parseInt` on numeric fields.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Expanded scoped frontend typecheck coverage:
+  - `apps/desktop/jsconfig.json` now includes `src/project-api.js` and `src/ui-playtest.js` in addition to the initial gate set.
+  - `apps/desktop/src/project-api.js` now uses a typed safe Tauri bridge accessor (`window["__TAURI__"]`) and typed unavailable-error shape.
+  - `apps/desktop/src/project-api.js` fallback snapshot hydration now normalizes `tile_id` for stricter checked contracts.
+  - `apps/desktop/src/ui-playtest.js` now uses guarded typed access for `window["__gcsPerfMetrics"]`.
+  - validated with:
+    - `cd apps/desktop && npm run typecheck`
+    - `cd apps/desktop && npm run lint`
+    - `cd apps/desktop && npm test`
+
+- Added anti-drift guardrails for frontend type contracts and sprint cadence:
+  - added `apps/desktop/jsconfig.json` with `allowJs + checkJs + noEmit` for an initial scoped frontend module set (`types.js`, `ui-launch-dashboard.js`, `ui-shell-entry.js`).
+  - added `npm run typecheck` (`tsc -p jsconfig.json --noEmit`) in `apps/desktop/package.json`.
+  - added CI `Frontend typecheck` gate in `.github/workflows/ci.yml`.
+  - added running drift-audit checklist doc `docs/reviews/Drift Audit Checklist (Running).md` and linked it from `docs/DOCUMENTATION_INDEX.md`.
+  - updated type-safety/workflow docs:
+    - `docs/frontend/Type Safety Plan.md`
+    - `docs/DEVELOPMENT_WORKFLOW.md`
+
+- Refactored launch dashboard template gallery to data-driven rendering:
+  - `apps/desktop/src/ui-launch-dashboard.js` now owns a single template catalog and hydrates both template selects and the template-card grid from that shared source.
+  - template-card selection state is now rendered with explicit active styling/`aria-pressed` parity (`apps/desktop/src/styles.css`).
+  - preserved existing quickstart/walkthrough flows while removing static template-card drift risk.
+  - validated with:
+    - `npm test`
+    - `npm run test:e2e:smoke:quickstart`
+
+- Normalized frontend playtest telemetry field naming to backend snake_case contract:
+  - updated fallback playtest payloads in `apps/desktop/src/project-api.js` to use `last_tick_delta_ms` and `last_tick_steps`.
+  - updated playtest overlay rendering in `apps/desktop/src/ui-playtest.js` to consume the normalized snake_case fields only.
+  - removed redundant camelCase telemetry aliases from `PlaytestState` in `apps/desktop/src/types.js`.
+  - aligned browser desktop-runtime bridge fixture payloads in `apps/desktop/tests-e2e/desktop-runtime.spec.mjs`.
+  - validated with:
+    - `npm test`
+    - `npx playwright test --config=playwright.config.mjs tests-e2e/desktop-runtime.spec.mjs`
+
+- Added manifest-driven project asset discovery for authored invoke exports:
+  - `crates/export-core/src/lib.rs` now reads optional `projectDir/assets/manifest.json` to resolve entity/tile asset mappings before falling back to filename conventions.
+  - supported manifest mapping shapes:
+    - `assets[]` entries with `id` + `path` (e.g., `entity_player`, `tile_1`)
+    - direct `entities` / `tiles` mapping objects.
+  - path handling is project-scoped for manifest mappings (rejects escaping parent traversal and out-of-project absolute paths).
+  - resolution priority is now:
+    1. explicit `editorState.*.assetPath`
+    2. manifest mappings
+    3. project filename conventions
+    4. generated placeholders
+  - added coverage:
+    - `crates/export-core/src/lib.rs` test `project_manifest_asset_mappings_are_preferred_over_conventions`
+    - `apps/desktop/src-tauri/src/invoke_api.rs` test `export_preview_dispatch_prefers_project_asset_manifest_mappings`
+
+- Added convention-based project asset discovery for authored invoke exports:
+  - `export_preview_html5` now supports optional `projectDir` and forwards it to export-core (`apps/desktop/src-tauri/src/invoke_api.rs`).
+  - `crates/export-core/src/lib.rs` now discovers project-local assets by convention (`assets/entities`, `assets/tiles`, `assets/sprites`) when `projectDir` is provided.
+  - explicit `assetPath` hints still take precedence over discovered paths.
+  - fallback placeholder generation remains unchanged for unresolved assets.
+  - added regression coverage:
+    - `crates/export-core/src/lib.rs` test `project_dir_asset_conventions_are_discovered_and_copied`
+    - `apps/desktop/src-tauri/src/invoke_api.rs` test `export_preview_dispatch_discovers_project_asset_conventions`
+    - `apps/desktop/tests/project-api.test.mjs` test `project-api export payload forwards optional projectDir to invoke bridge`
+  - frontend app-state export now forwards current `projectDir` (`apps/desktop/src/app-state.js`, `apps/desktop/src/project-api.js`).
+
+- Added minimal real authored-asset copy support on invoke export lane:
+  - `crates/export-core/src/lib.rs` now supports authored-state-aware asset hints (`assetPath`) and copies real files into export bundle under `assets/imported/*` when provided.
+  - invoke export path now passes authored editor-state hints into export-core asset inference (`apps/desktop/src-tauri/src/invoke_api.rs`).
+  - fallback behavior remains safe/deterministic: missing or invalid source paths continue to emit generated placeholder assets (`assets/generated/*.svg`).
+  - added/expanded coverage:
+    - `crates/export-core/src/lib.rs` test `authored_asset_paths_are_copied_into_export_when_present`
+    - `apps/desktop/src-tauri/src/invoke_api.rs` test `export_preview_dispatch_copies_authored_asset_paths`
+  - updated export payload typing hints in `apps/desktop/src/types.js` and command surface docs in `docs/commands/Command Surface.md`.
+
+- Added authored export profile-lane E2E coverage:
+  - new spec `apps/desktop/tests-e2e/authored-export-profiles.spec.mjs` generates authored invoke exports for `game_boy`, `nes`, and `snes`, then asserts:
+    - profile metadata contract (`metadata.json`)
+    - profile viewport dimensions in `scenes.json`
+    - non-zero asset manifest contract and packaged asset availability
+    - runtime-loaded asset count + authored scene render path in browser
+  - added npm script `test:e2e:authored:profiles` in `apps/desktop/package.json`
+  - wired authored profile-lane E2E into CI in `.github/workflows/ci.yml` (`Frontend authored export profile E2E` step).
+  - validated with `npm run test:e2e:authored:profiles`
+
+- Added authored-export browser regression coverage:
+  - new Playwright authored export spec `apps/desktop/tests-e2e/authored-export.spec.mjs` builds `Sample Game 01`, verifies non-zero `asset_count` in `assets/manifest.json`, confirms packaged asset path availability, and asserts runtime-loaded asset count through export bridge.
+  - added `test:e2e:authored` script in `apps/desktop/package.json`.
+  - export runtime bridge now exposes `getLoadedAssetCount()` in `crates/export-core/templates/runtime.js` for deterministic authored-asset load assertions.
+  - validated with:
+    - `npm run test:e2e:authored`
+
+- Wired authored export placeholder assets into the shared export runtime:
+  - `crates/export-core/templates/runtime.js` now loads `assets/manifest.json`, preloads referenced files, and renders tiles/entities via asset IDs when images are available.
+  - canonical parity lane behavior remains unchanged because empty manifests still fall back to deterministic primitive tile/entity rendering.
+  - validated with:
+    - `cargo test -p export-core`
+    - `cargo test -p gcs-desktop --bin gcs-desktop` (with `CARGO_TARGET_DIR=target-tauri`)
+    - `npm test`
+    - `npm run lint`
+    - `npm run test:e2e:export:gb`
+
+- Added authored-export support on desktop invoke path while preserving canonical parity lane:
+  - `apps/desktop/src-tauri/src/invoke_api.rs` `export_preview_html5` now exports authored scene content from live editor state by default and supports optional `editorState` payload override.
+  - `crates/export-core/src/lib.rs` now exposes `build_html5_preview_artifact_with_scenes(...)` and `build_authored_preview_scene(...)` for explicit scene-source control.
+  - `apps/desktop/scripts/build-sample-game-01.mjs` now exports through invoke payload path so sample artifacts reflect authored map data.
+  - authored invoke exports now emit inferred assets into `assets/manifest.json` (`tile_*`, `entity_*`) and package generated placeholder SVG files under `assets/generated/*.svg`, so `asset_count` now reflects authored content usage.
+  - updated command/docs tracking in:
+    - `docs/commands/Command Surface.md`
+    - `docs/KNOWN_ISSUES.md`
+    - `docs/sprints/Sprint Plan.md`
+
+- Upgraded export preview artifact from static-only parity canvas to minimal interactive baseline:
+  - `crates/export-core/templates/runtime.js` now keeps parity rendering behavior while adding primary-entity movement APIs and keyboard controls (Arrow/WASD)
+  - `crates/export-core/templates/index.html` now includes explicit movement-control guidance
+  - added export interaction coverage in `apps/desktop/tests-e2e/export-parity.spec.mjs`
+  - strengthened `export-core` runtime template test assertions in `crates/export-core/src/lib.rs`
+
+- Added dogfood "build a game with our own tool" coverage:
+  - new Playwright smoke scenario `dogfood flow builds and export-previews a mini puzzle game` in `apps/desktop/tests-e2e/smoke.spec.mjs`
+  - new running test doc `docs/testing/Dogfood Game Build Scenarios.md`
+  - documentation index updated with dogfood scenario entry (`docs/DOCUMENTATION_INDEX.md`)
+  - added scripted sample artifact build command `build:sample:game01` (`apps/desktop/scripts/build-sample-game-01.mjs`) that outputs `samples/Sample Game 01/*`
+  - updated sample builder to also mirror artifacts into `apps/desktop/export-artifacts/sample-game-01/*` for direct local static-server access
+
+- Added dedicated puzzle starter logic scaffold:
+  - `apps/desktop/src/ui-script-templates.js` now includes built-in `Sokoban Push Rules` template and maps `puzzle` starter projects to it
+  - onboarding action runner now supports direct puzzle scaffold action (`apps/desktop/src/ui-onboarding.js`)
+  - walkthrough set now includes `Sokoban-style Puzzle Room` and launch selector wiring (`apps/desktop/src/ui-walkthrough.js`, `apps/desktop/src/index.html`)
+  - launch dashboard `New` action now applies starter script templates after workspace init for parity with topbar `New` flow (`apps/desktop/src/ui-launch-dashboard.js`, `apps/desktop/src/ui-shell.js`)
+  - smoke coverage added for puzzle starter script auto-apply path (`apps/desktop/tests-e2e/smoke.spec.mjs`)
+  - scripting docs updated with puzzle template mapping (`docs/scripting/Event Graph Node Catalog (v1).md`)
+  - manual QA running checklist now includes puzzle starter script scaffold verification (`docs/testing/Manual QA (Running).md`)
+
+- Expanded Draw Studio starter preset usability:
+  - `apps/desktop/src/ui-draw-seed.js` now includes recognizable built-in seed presets (`tree`, `bush`, `rock`, `crate`, `chest`) in addition to existing quick presets
+  - validated with `node --check apps/desktop/src/ui-draw-seed.js`, `npm run lint`, `npm test`, `npm run test:e2e:smoke`
+
+- Added online-reference clone blueprint:
+  - new tutorial doc `docs/tutorials/Clone Blueprint - Sokoban Online.md`
+  - linked from `docs/DOCUMENTATION_INDEX.md`
+
+- Added implementation-facing starter asset pack baseline:
+  - new spec doc `docs/tooling/Starter Asset Pack Spec.md` defining profile starter contents, Draw Seed quality contract, naming/versioning, and acceptance criteria
+  - updated docs index to include Event Graph catalog and starter pack spec (`docs/DOCUMENTATION_INDEX.md`)
+  - updated sprint immediate queue to track starter-pack implementation slice in active execution (`docs/sprints/Sprint Plan.md`)
+
+- Updated gameplay-logic and asset-quality product specs:
+  - expanded `docs/scripting/Scripting UX and Translation Assistant.md` with Event Graph node taxonomy, typed-link execution model, and nuance scaling strategy (subgraphs/state-machine/scoped vars/hybrid script nodes)
+  - expanded `docs/tooling/Tool Capability Matrix.md` with profile starter-asset pack requirements and deterministic Draw Seed quality bar
+  - aligned `Design Doc Final v1.1.txt` with explicit starter asset pack requirement and no-code scripting nuance model
+  - updated sprint execution queue in `docs/sprints/Sprint Plan.md` for Sprint 3 prep items (node taxonomy contracts + starter asset pack implementation spec)
+  - added tutorial blueprint doc `docs/tutorials/Clone Blueprint - Zelda-like Room.md` and linked it from `docs/DOCUMENTATION_INDEX.md`
+
+- Advanced frontend type-safety and render-path hardening:
+  - added explicit JSDoc contracts to high-churn controller modules:
+    - `apps/desktop/src/ui-canvas-renderer.js`
+    - `apps/desktop/src/ui-playtest.js`
+    - `apps/desktop/src/ui-draw-seed.js`
+  - improved `ui-canvas-renderer` entity-layer behavior to reuse keyed DOM nodes during drag/playtest updates instead of recreating all entity nodes per render pass
+  - updated `docs/frontend/Type Safety Plan.md` progress list for this slice
+  - validated with `npm run format:check`, `npm run lint`, `npm test`, and `npm run test:e2e:smoke`
+
+- Promoted CI perf budgets to strict mode with playtest telemetry coverage:
+  - `apps/desktop/scripts/playwright-metrics.mjs` now parses both launch/workspace and playtest telemetry attachments (`perf-launch-workspace`, `perf-playtest-feedback`)
+  - budget summary now includes `playtest_first_frame` and `playtest_update` checks in addition to launch/workspace timings
+  - CI perf summary step in `.github/workflows/ci.yml` now runs with calibrated strict thresholds (`GCS_PERF_BUDGET_STRICT=1`)
+  - testing docs updated for strict-mode defaults and threshold tuning workflow:
+    - `docs/testing/Test Strategy.md`
+    - `docs/testing/Testing Plan (Living).md`
+
+- Closed export parity profile-edge coverage gap:
+  - `crates/export-core/src/lib.rs` now uses profile-dynamic edge/corner coordinates in clamp-focused preview scenes (removed fixed Game Boy-only edge values)
+  - added `profile_bounds_stress_layout` to increase profile-bound edge/overflow coverage
+  - validated pixel-exact parity for all profile export lanes:
+    - `npm run test:e2e:export:gb`
+    - `npm run test:e2e:export:nes`
+    - `npm run test:e2e:export:snes`
+
+- Completed playtest responsiveness telemetry hardening loop:
+  - added Playwright smoke coverage in `apps/desktop/tests-e2e/smoke.spec.mjs` asserting playtest telemetry probe contract (`playtestFirstFrameDeltaMs`, `playtestLastMetricUpdateDeltaMs`)
+  - validated overlay feedback text transitions from pending to measured values in active playtest
+  - expanded workspace bootstrap unit coverage in `apps/desktop/tests/ui-workspace-bootstrap.test.mjs` for playtest telemetry callback wiring
+  - validated with `npm run lint`, `npm test`, and `npm run test:e2e:smoke`
+
+- Expanded native export parity fixture complexity:
+  - `crates/export-core/src/lib.rs` now emits additional profile-aware preview scenes (`scene_count` now 6) with denser tile layouts and dynamic profile-bound corner coverage
+  - updated export-core debug-mode test expectation for expanded scene set
+  - validated with `cargo test -p export-core` and `npm run test:e2e:export:gb`
+
+- Hardened Issues Drawer recovery guidance for runtime failures:
+  - `apps/desktop/src/ui-issues-recovery.js` now models retry guidance for retryable app-state failures via `retry_last_action`
+  - retry handlers now cover script validation, breakpoint reapply, and core editor command retries using current snapshot context
+  - non-retryable/unsafe flows still route to explicit `reload_editor` recovery action
+  - added coverage in `apps/desktop/tests/ui-issues-recovery.test.mjs`
+  - validated with `npm test`, `npm run lint`, and `npm run format:check`
+
+- Expanded playtest runtime edge-case hardening and direct coverage:
+  - `apps/desktop/src-tauri/src/editor_runtime.rs` now clears `last_breakpoint_hit` when breakpoint sets are reconfigured
+  - breakpoint handling now preserves higher-priority item/quest breakpoint hits by skipping lower-priority tick breakpoint overrides once paused
+  - added direct runtime tests for:
+    - item-vs-tick breakpoint priority
+    - breakpoint-hit reset on breakpoint reconfiguration
+    - paused/unpaused accumulator carry-over timing behavior
+  - validated with `cargo test -p gcs-desktop --bin gcs-desktop`
+
+- Eliminated export preview runtime/index duplication between JS and Rust build lanes:
+  - added canonical templates:
+    - `crates/export-core/templates/runtime.js`
+    - `crates/export-core/templates/index.html`
+  - `crates/export-core/src/lib.rs` now renders artifact runtime/html from shared templates (token replacement for debug/mode/profile)
+  - `apps/desktop/scripts/build-export-artifacts.mjs` now reads and materializes the same shared templates instead of inline duplicated strings
+  - validated with `cargo test -p export-core`, `npm run build:export:preview:js`, `npm run test:e2e:export:gb`, `npm run lint`, `npm run format:check`, `cargo fmt --all -- --check`
+
+- Closed two review follow-ups in reliability hardening:
+  - capped fallback editor undo history in `apps/desktop/src/project-api.js` (`FALLBACK_UNDO_LIMIT=128`) to prevent unbounded browser-session growth
+  - added regression coverage in `apps/desktop/tests/project-api.test.mjs` verifying bounded undo behavior under long edit sequences
+  - added manifest schema upper-bound validation in `crates/project-core/src/model.rs` to reject unsupported future schema versions
+  - added `project-core` unit test for future-schema rejection in `crates/project-core/src/lib.rs`
+  - validated with `npm test -- project-api.test.mjs` and `cargo test -p project-core`
+
+- UI/UX hardening pass (best-practice parity with tool/engine launcher + shell behavior):
+  - fixed dashboard profile selection wiring so selected profile now propagates into workspace assisted-profile defaults
+  - added retry-safe lazy module loading in `ui-shell-module-bundle` after transient dynamic-import failures
+  - hardened layout preference reads for restricted-storage contexts (`localStorage.getItem` try/catch fallback)
+  - added ARIA keyboard tab navigation for right-panel tabs (Arrow/Home/End + Enter/Space activation)
+  - added playtest listener disposal cleanup to prevent handler accumulation on re-init/dispose
+  - replaced hard-coded map tile/grid sizing with `--tile-size` variable wiring from viewport controller
+  - replaced stale canvas placeholder copy with user-facing ready-state guidance
+  - added loader regression unit coverage in `apps/desktop/tests/ui-shell-module-bundle.test.mjs`
+
+- Documentation clarity and navigation pass:
+  - added centralized docs map: `docs/DOCUMENTATION_INDEX.md`
+  - added documentation standards/checklist: `docs/DOCUMENTATION_STANDARDS.md`
+  - simplified `README.md` start-here section to point at canonical docs entry points
+  - refreshed stale architecture/testing/workflow statements in:
+    - `docs/ARCHITECTURE_OVERVIEW.md`
+    - `docs/DEVELOPMENT_WORKFLOW.md`
+    - `docs/testing/Testing Plan (Living).md`
+    - `docs/sprints/Sprint Plan.md`
+
+- Recorded codebase audit follow-ups and executed full CI-equivalent validation pass:
+  - documented review findings in `docs/KNOWN_ISSUES.md`
+  - ran Rust gates (`cargo fmt --all -- --check`, `cargo test`, `cargo check`)
+  - ran frontend gates (`npm run lint`, `npm run format:check`, `npm test`, `npm run test:e2e:ci`, `npm run test:e2e:metrics`)
+  - ran Windows runtime lane checks (`cargo check/build -p gcs-desktop --features tauri-runtime`, invoke smoke, NES/SNES export smoke + parity)
+- Continued shell decomposition with runtime wiring extraction:
+  - added `apps/desktop/src/ui-shell-runtime.js` for playtest toggling, breakpoint delegation, and shared controller-disposal orchestration
+  - `apps/desktop/src/ui-shell.js` now delegates runtime wiring through `createShellRuntimeController(...)`
+  - added `apps/desktop/tests/ui-shell-runtime.test.mjs` for runtime branch/delegation/disposal contracts
+  - reduced `ui-shell.js` size from `292` to `286` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with module-bundle loader extraction:
+  - added `apps/desktop/src/ui-shell-module-bundle.js` for lazy editor-module loading, memoization, and preload telemetry mark callbacks
+  - `apps/desktop/src/ui-shell.js` now uses `createEditorModuleBundleLoader(...)` instead of inline module-promise tracking
+  - added `apps/desktop/tests/ui-shell-module-bundle.test.mjs` for one-shot load and preload-mark contract coverage
+  - reduced `ui-shell.js` size from `317` to `292` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with DOM element query extraction:
+  - added `apps/desktop/src/ui-shell-elements.js` for centralized shell DOM lookup contracts and grouped command/tool button mappings
+  - `apps/desktop/src/ui-shell.js` now initializes via `collectShellElements(document)` and forwards the shared object to workspace bootstrap shaping
+  - added `apps/desktop/tests/ui-shell-elements.test.mjs` for element-query contract validation
+  - reduced `ui-shell.js` size from `536` to `317` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with editor-workspace render extraction:
+  - added `apps/desktop/src/ui-shell-render.js` for workspace render orchestration (health/issue/status context + controller render fan-out)
+  - `apps/desktop/src/ui-shell.js` now delegates workspace rendering through `renderEditorWorkspace(...)`
+  - added `apps/desktop/tests/ui-shell-render.test.mjs` for shell text-field and controller delegation render contracts
+  - reduced `ui-shell.js` size from `550` to `536` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with bootstrap element-map and help-tour step extraction:
+  - added `apps/desktop/src/ui-shell-bootstrap-elements.js` for `createHelpTourSteps()` and `buildWorkspaceBootstrapElements(...)`
+  - `apps/desktop/src/ui-shell.js` now consumes the extracted bootstrap-step/element mapping contracts
+  - added `apps/desktop/tests/ui-shell-bootstrap-elements.test.mjs` for deterministic step-sequence and element-map reference coverage
+  - reduced `ui-shell.js` size from `587` to `550` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with workspace-bootstrap extraction:
+  - added `apps/desktop/src/ui-workspace-bootstrap.js` for editor-workspace controller composition and bind/init orchestration
+  - `apps/desktop/src/ui-shell.js` now delegates workspace initialization through `initializeWorkspaceControllers(...)`
+  - added `apps/desktop/tests/ui-workspace-bootstrap.test.mjs` for bootstrap sequencing and guardrail-callback delegation contracts
+  - reduced `ui-shell.js` size from `750` to `587` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with assisted-guardrail and logging helper extraction:
+  - added `apps/desktop/src/ui-assisted-guardrail.js` for assisted guardrail fallback/delegation modeling
+  - added `apps/desktop/src/ui-shell-log.js` for shell log-line formatting
+  - `apps/desktop/src/ui-shell.js` now delegates guardrail resolution and log formatting through these helpers
+  - added tests:
+    - `apps/desktop/tests/ui-assisted-guardrail.test.mjs`
+    - `apps/desktop/tests/ui-shell-log.test.mjs`
+  - reduced `ui-shell.js` size from `752` to `750` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with workspace-listener extraction:
+  - added `apps/desktop/src/ui-workspace-bindings.js` for workspace listener wiring (issues recovery/auto-fix clicks, entity selection clicks, inspector name change)
+  - `apps/desktop/src/ui-shell.js` now delegates workspace listener bind/dispose through `workspaceBindingsController`
+  - added `apps/desktop/tests/ui-workspace-bindings.test.mjs` for selection and project-name normalization contracts
+  - reduced `ui-shell.js` size from `789` to `752` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with breakpoint toggle extraction:
+  - added `apps/desktop/src/ui-breakpoints.js` for breakpoint-kind selection/toggle modeling and apply-toggle dispatch
+  - `apps/desktop/src/ui-shell.js` now routes breakpoint toggles through `applyBreakpointToggle(...)`
+  - added `apps/desktop/tests/ui-breakpoints.test.mjs` for enabled-kind, next-kind, and apply-toggle contracts
+  - reduced `ui-shell.js` size from `802` to `789` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with entry/preload extraction:
+  - added `apps/desktop/src/ui-shell-entry.js` for entry-mode normalization, workspace-init orchestration, and module preload scheduling
+  - `apps/desktop/src/ui-shell.js` now delegates entry transitions + preload logic through `shellEntryController`
+  - added `apps/desktop/tests/ui-shell-entry.test.mjs` for mode normalization, init behavior/error reporting, and preload scheduling contracts
+  - reduced `ui-shell.js` size from `866` to `802` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with health/issues extraction:
+  - added `apps/desktop/src/ui-health-issues.js` for health summary text + issue aggregation modeling
+  - `apps/desktop/src/ui-shell.js` now uses `buildHealthIssuesModel(...)` instead of inlined health/issue branching logic
+  - added `apps/desktop/tests/ui-health-issues.test.mjs` for missing-health and aggregated issue-list contracts
+  - reduced `ui-shell.js` size from `884` to `866` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with status/HUD extraction:
+  - added `apps/desktop/src/ui-shell-status.js` for command/tool state modeling and HUD/runtime badge rendering
+  - `apps/desktop/src/ui-shell.js` now delegates status rendering through `shellStatusController`
+  - added `apps/desktop/tests/ui-shell-status.test.mjs` for edit/playtest status-model contract coverage
+  - reduced `ui-shell.js` size from `894` to `884` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with entity-list extraction:
+  - added `apps/desktop/src/ui-entity-list.js` for entity row formatting and list DOM rendering
+  - `apps/desktop/src/ui-shell.js` now delegates entity-list rendering via `entityListController`
+  - added `apps/desktop/tests/ui-entity-list.test.mjs` for empty-state and selected-row text formatting coverage
+  - reduced `ui-shell.js` size from `902` to `894` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with state-event extraction:
+  - added `apps/desktop/src/ui-shell-events.js` for app-event subscription wiring (`project`, `playtest`, `diagnostics`, `assisted`, `script`, `app:error`)
+  - `apps/desktop/src/ui-shell.js` now delegates event binding through `shellEventsController`
+  - added `apps/desktop/tests/ui-shell-events.test.mjs` for event routing/logging/render side-effect coverage
+  - reduced `ui-shell.js` size from `990` to `902` lines in this slice
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued shell decomposition with lifecycle extraction:
+  - added `apps/desktop/src/ui-shell-lifecycle.js` for global error boundary + before-unload teardown wiring
+  - `apps/desktop/src/ui-shell.js` now delegates lifecycle hooks through `shellLifecycleController`
+  - added `apps/desktop/tests/ui-shell-lifecycle.test.mjs` to verify global error forwarding and unload cleanup behavior
+  - validated gates (`npm run lint`, `npm test`)
+
+- Advanced Type Safety Plan Phase 1 in frontend controllers:
+  - added JSDoc dependency/controller contracts for launch entry flow in `apps/desktop/src/ui-launch-dashboard.js`
+  - updated `docs/frontend/Type Safety Plan.md` progress with typed launch/lifecycle controller coverage
+  - validated gates (`npm run lint`, `npm test`)
+
+- Extended Playwright metrics parser with perf trend deltas:
+  - `apps/desktop/scripts/playwright-metrics.mjs` now computes dashboard/editor/workspace deltas versus the previous perf-enabled daily row
+  - generated metrics markdown now includes a `Perf Trend Delta` section in addition to budget checks
+  - non-blocking regression warnings now support threshold env vars:
+    - `GCS_PERF_DELTA_WARN_DASHBOARD_MS`
+    - `GCS_PERF_DELTA_WARN_EDITOR_INIT_MS`
+    - `GCS_PERF_DELTA_WARN_WORKSPACE_ENTER_MS`
+  - validated flow by generating CI report (`npm run test:e2e:ci`) and parsing metrics (`npm run test:e2e:metrics`)
+
+- Added dedicated perf instrumentation unit tests:
+  - new `apps/desktop/tests/ui-perf-metrics.test.mjs` validates metrics initialization and mark/update semantics
+  - updated coverage tracking docs to include perf-instrumentation unit layer
+  - validated gates (`npm run lint`, `npm test`)
+
+- Continued `ui-shell` decomposition with perf metrics extraction:
+  - added `apps/desktop/src/ui-perf-metrics.js` to own launch/workspace timing state and publishing
+  - removed inline perf state helper block from `apps/desktop/src/ui-shell.js`
+  - preserved existing metrics probe contract consumed by smoke tests and CI metrics parser
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`)
+
+- Added CI perf budget summary pipeline (soft warnings):
+  - smoke perf probe now attaches launch/workspace metrics payload through Playwright JSON artifacts
+  - `apps/desktop/scripts/playwright-metrics.mjs` now parses perf attachments, summarizes budget checks, and emits warnings
+  - added optional strict budget mode (`GCS_PERF_BUDGET_STRICT=1`) for future gate promotion
+  - CI now runs metrics step with explicit perf budget env defaults (`.github/workflows/ci.yml`)
+  - updated testing docs + coverage matrix for dashboard/perf budget coverage status
+
+- Added frontend perf timing probes and test contract:
+  - shell now publishes launch/workspace timing metrics to `window.__gcsPerfMetrics`
+  - metrics include dashboard first paint delta, editor init duration, workspace entered delta, and preload schedule/resolve stamps
+  - added Playwright smoke assertion for metrics surface + non-negative timing contract
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`)
+
+- Added idle-time editor chunk preloading for launch dashboard:
+  - scheduled best-effort preload on dashboard route (`requestIdleCallback` + timeout fallback)
+  - reused shared module-bundle promise to avoid duplicate dynamic-import work between preload and first workspace entry
+  - kept preload non-blocking and failure-tolerant
+  - stabilized shortcut smoke test by setting explicit canvas focus before keyboard assertions
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`)
+
+- Completed dashboard code-splitting optimization pass:
+  - converted `apps/desktop/src/ui-shell.js` editor-module imports to dynamic `import(...)` during first workspace entry
+  - added init-promise guard to prevent duplicate workspace bootstrap during concurrent route/action events
+  - updated route sequencing so workspace activation occurs after init readiness
+  - kept init failures routed through global `app:error` flow
+  - hardened shortcut smoke E2E with explicit canvas focus before keyboard assertions
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`)
+
+- Added deferred editor initialization boundary for dashboard-first launch:
+  - refactored `apps/desktop/src/ui-shell.js` so editor controllers/event wiring initialize only when entering `editor_workspace`
+  - dashboard launch no longer pays editor setup cost before user chooses New/Open/Continue/Recover
+  - guarded state-event render paths so dashboard mode remains safe before editor controllers exist
+  - fixed dashboard UI-mode handoff by persisting selected mode before workspace init in `apps/desktop/src/ui-launch-dashboard.js`
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`)
+
+- Completed launch dashboard wiring and dashboard-first route behavior:
+  - integrated `apps/desktop/src/ui-launch-dashboard.js` into `apps/desktop/src/ui-shell.js` with explicit bind/render/dispose lifecycle hooks
+  - added shell route gating so launch mode renders dashboard while editor workspace stays unmounted visually until transition
+  - set `#editor-workspace` hidden at initial markup render in `apps/desktop/src/index.html` to prevent startup flicker and ambiguous element selection
+  - changed dashboard UI mode default to `beginner` for first-project creation path
+  - expanded smoke E2E in `apps/desktop/tests-e2e/smoke.spec.mjs` for launch dashboard assertions, dashboard-driven starter creation flow, and dashboard `Continue`/`Recover` action routes
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`, `npm run test:e2e:smoke`)
+
+- Added dashboard-first UX and implementation planning package:
+  - new `docs/frontend/Launch Dashboard and Entry Flow.md` with entry-state architecture, rollout phases, and optimized coding guidance
+  - synced `docs/frontend/Visual Design System.md` with launch-surface rules and beginner-default constraints
+  - updated sprint execution priorities in `docs/sprints/Sprint Plan.md` to start dashboard route + template-first entry flow
+  - updated testing docs (`docs/testing/Test Strategy.md`, `docs/testing/Testing Plan (Living).md`) with dashboard-critical coverage requirements
+  - updated `docs/ARCHITECTURE_OVERVIEW.md` and `docs/tooling/Tool Capability Matrix.md` to align architecture/capability tracking with dashboard-first entry direction
+  - references now include official engine onboarding docs and web performance/accessibility implementation standards
+
+## 2026-02-14
+- Continued `ui-shell` decomposition with issues/recovery extraction:
+  - added `apps/desktop/src/ui-issues-recovery.js` to own Issues Drawer row assembly, assisted guardrail/action generation, and recovery-action execution routing
+  - `apps/desktop/src/ui-shell.js` now delegates issue rendering and issue-action dispatch to `issuesRecoveryController`
+  - retained onboarding guardrail integration while removing duplicated issue/recovery logic from shell
+  - reduced `ui-shell` size from `1029` to `797` lines in this slice
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with canvas renderer extraction:
+  - added `apps/desktop/src/ui-canvas-renderer.js` to own map tile/entity DOM rendering
+  - `apps/desktop/src/ui-shell.js` now delegates canvas rendering to `canvasRendererController`
+  - added lightweight render signatures for tiles/entities/selection/diagnostics/drag-state to skip unnecessary DOM rebuilds during high-frequency render loops
+  - reduced `ui-shell` size from `1091` to `1029` lines in this slice
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`, `npm run test:e2e:smoke:quickstart`)
+- Added focused workspace layout controls for editor usability:
+  - added `apps/desktop/src/ui-layout-panels.js` to own panel-collapse state, right-panel tab state, and profile-aware tab visibility
+  - topbar now exposes `Hide/Show Left Panel` and `Hide/Show Right Panel` controls with persisted state
+  - right rail now uses tab groups (`Inspector`, `Draw`, `Script`, `Issues`) to reduce scroll overload and improve task focus
+  - `apps/desktop/src/ui-shell.js` now delegates layout bind/render/dispose lifecycle to `layoutPanelsController`
+  - added Playwright coverage for panel collapse and right-panel tab switching in `apps/desktop/tests-e2e/smoke.spec.mjs`
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with map viewport extraction:
+  - added `apps/desktop/src/ui-map-viewport.js` to own diagnostics toggle controls, zoom mode state, fit-scale calculations, and viewport CSS variable updates
+  - `apps/desktop/src/ui-shell.js` now delegates viewport behavior to `mapViewportController`
+  - removed shell-owned zoom state and viewport helper functions
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with editor input extraction:
+  - added `apps/desktop/src/ui-editor-input.js` to own map action buttons and keyboard command handling
+  - `apps/desktop/src/ui-shell.js` now delegates map/tool/shortcut input lifecycle to `editorInputController`
+  - removed inline shell handlers for map command buttons and global editor keydown logic
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with topbar command extraction:
+  - added `apps/desktop/src/ui-command-bar.js` to own topbar command routing (`open`, `save`, `play`, `new`)
+  - `apps/desktop/src/ui-shell.js` now delegates topbar command listener lifecycle to `commandBarController`
+  - removed inline topbar command event block from shell
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with preferences extraction:
+  - added `apps/desktop/src/ui-preferences.js` to own UI profile preference read/write/apply lifecycle
+  - `apps/desktop/src/ui-shell.js` now delegates UI profile behavior to `preferencesController`
+  - removed duplicated shell-level preference persistence helpers
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with Script Lab validation extraction:
+  - added `apps/desktop/src/ui-script-lab.js` to own script validate-button wiring, validation summary rendering, and issue auto-fix flow
+  - `apps/desktop/src/ui-shell.js` now delegates Script Lab lifecycle and autofix handling to `scriptLabController`
+  - removed Script Lab validation/autofix helper methods from shell
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with Script Template controller extraction:
+  - added `apps/desktop/src/ui-script-templates.js` to own Script Lab template storage/options/apply/save/delete lifecycle
+  - `apps/desktop/src/ui-shell.js` now delegates script-template init/bind/dispose and starter-template assignment to `scriptTemplatesController`
+  - reduced `ui-shell` size by removing script-template helper/storage code paths
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell` decomposition with debug panel extraction:
+  - added `apps/desktop/src/ui-debug-panels.js` to own trace/watch/issues rendering and trace/watch filter event lifecycle
+  - `apps/desktop/src/ui-shell.js` now delegates debug panel bind/dispose/render behavior through `debugPanelsController`
+  - removed redundant per-render issue button listener attachment path from shell render flow
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Hardened browser storage persistence failure paths:
+  - `apps/desktop/src/ui-shell.js` now safely handles `localStorage.setItem` failures for UI profile and script template persistence
+  - `apps/desktop/src/ui-draw-seed.js` now safely handles preset persistence write failures (including `QuotaExceededError`)
+  - fallback behavior logs non-fatal warnings instead of allowing runtime write exceptions to break user workflows
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Completed DOM sink hardening for core shell render surfaces:
+  - removed remaining `innerHTML` rendering paths in `apps/desktop/src/ui-shell.js` and `apps/desktop/src/ui-draw-seed.js`
+  - switched shell list/layer rendering (entities, issues, tiles, trace, watch, script templates) to explicit DOM node construction
+  - removed obsolete `escapeHtml` shell plumbing after node-based rendering conversion
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued DOM sink hardening without behavior regressions:
+  - removed `innerHTML` rendering paths from extracted controllers:
+    - `apps/desktop/src/ui-onboarding.js`
+    - `apps/desktop/src/ui-walkthrough.js`
+    - `apps/desktop/src/ui-help-tour.js`
+  - switched those views to explicit DOM construction (`createElement`, `textContent`, `replaceChildren`)
+  - preserved existing action routing (`data-onboarding-action`, `data-walkthrough-*`, `data-help-summary-action`)
+  - lint warning surface for restricted HTML sinks reduced to remaining legacy surfaces in `ui-shell` + `ui-draw-seed`
+  - validated gates (`npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Applied optimization hardening fixes from review queue:
+  - hardened `engine-core` entity ID allocation by replacing saturating behavior with explicit overflow error path
+  - added overflow regression test for create-entity command safety in `crates/engine-core/src/map_editor.rs`
+  - clarified backup retention contract: `max_backups=0` now explicitly disables backup creation
+  - added project-core test coverage for no-backup mode in `crates/project-core/src/lib.rs`
+  - added ESLint guardrails warning on direct HTML sink usage (`innerHTML`, `outerHTML`, `insertAdjacentHTML`) in `apps/desktop/eslint.config.mjs`
+  - documented ranked optimization hardening queue + acceptance criteria in sprint plan
+- Review hardening and optimization pass:
+  - added baseline security headers to local static server responses in `apps/desktop/scripts/static-server.mjs` (`CSP`, `X-Frame-Options`, `nosniff`, `CORP`, referrer policy, local CORS scope)
+  - optimized migration registration in `crates/project-core/src/migration.rs` by switching from full-list sort-on-each-register to ordered insertion
+  - normalized frontend formatting across app/tests/scripts (`npm run format`) and revalidated style gate (`npm run format:check`)
+  - validated full quality gates after hardening (`cargo fmt --check`, `cargo check`, `cargo test`, `npm run lint`, `npm test`, `npm run test:e2e:smoke:quickstart`)
+- Continued `ui-shell.js` decomposition with onboarding extraction:
+  - added `apps/desktop/src/ui-onboarding.js` to own Quick Start checklist render/state, onboarding actions, and checklist event wiring
+  - `ui-shell` now delegates onboarding render/action/event handling to `onboardingController`
+  - removed duplicate per-render onboarding button listeners and kept a single delegated checklist listener path
+  - added onboarding cleanup on unload (`onboardingController.dispose()`) to keep listener lifecycle explicit
+  - validated quality gates (`npm run lint`, `npm test`, targeted `npm run test:e2e -- tests-e2e/smoke.spec.mjs --grep "quick start|guided walkthrough"`)
+- Added faster local E2E loops for smoke workflows:
+  - added `npm run test:e2e:smoke` (smoke suite without forced export rebuild)
+  - added `npm run test:e2e:smoke:quickstart` (Quick Start + walkthrough subset)
+  - documented why `test:e2e` appears slower (it intentionally includes native export preview build)
+- Continued `ui-shell.js` decomposition with Help overlay/tour extraction:
+  - added `apps/desktop/src/ui-help-tour.js` for help visibility state, guided-tour progression/focus, and summary actions
+  - `ui-shell` now delegates help rendering and control events to `helpTourController`
+  - added explicit help controller cleanup on unload (`dispose`) to remove event listeners and focus styling
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e`, `npm run test:e2e:visual`)
+- Fixed flaky local Playwright behavior where tests could fail with `ERR_CONNECTION_REFUSED` and then pass on rerun:
+  - root cause: concurrent `test:e2e` and `test:e2e:visual` runs shared the same local server port/lifecycle (`4173`)
+  - `static-server` now reads configurable port via `GCS_STATIC_PORT`
+  - added dedicated visual Playwright config `apps/desktop/playwright.visual.config.mjs` using isolated port `4174`
+  - updated `test:e2e:visual` script to use the visual config
+  - disabled server reuse for deterministic local ownership (`reuseExistingServer: false`)
+  - validated by running both suites concurrently (`35 + 2` passing)
+- Started Frontend Type Safety Plan Phase 1 implementation:
+  - added shared JSDoc type contracts in `apps/desktop/src/types.js` (snapshot, playtest, diagnostics, command payloads)
+  - updated `apps/desktop/src/app-state.js` with typedef imports and core state/response annotations
+  - updated `apps/desktop/src/project-api.js` with typedef imports and typed payload objects for key invoke paths
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e`, `npm run test:e2e:visual`)
+- Continued `ui-shell.js` decomposition with map interaction extraction:
+  - added `apps/desktop/src/ui-map-interaction.js` to own map tool mode, pointer drag pipeline, marquee selection, and tile-stroke commit flow
+  - `ui-shell` now delegates map interaction handlers/state (`activeTool`, `dragState`, marquee rendering) to the new controller
+  - added explicit map interaction event cleanup via controller `dispose()` on unload
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e`, `npm run test:e2e:visual`)
+- Continued `ui-shell.js` decomposition with Playtest extraction:
+  - added `apps/desktop/src/ui-playtest.js` to own playtest viewport rendering, loop scheduling, breakpoint/trace controls, and zoom behavior
+  - `ui-shell` now delegates playtest rendering + loop sync to the new controller and binds playtest UI events through module boundaries
+  - added explicit playtest observer cleanup on app unload (`ResizeObserver.disconnect`) via controller `dispose()`
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e`, `npm run test:e2e:visual`)
+- Continued `ui-shell.js` decomposition with Draw Studio extraction:
+  - added `apps/desktop/src/ui-draw-seed.js` for draw draft state, preset CRUD, import/export, and preview canvas interactions
+  - `ui-shell` now delegates draw-seed operations and consumes controller warning state for Issues Drawer rendering
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e`, `npm run test:e2e:visual`)
+- Started `ui-shell.js` decomposition:
+  - added `apps/desktop/src/ui-walkthrough.js` module for walkthrough definitions + state + render + interaction handling
+  - `ui-shell` now delegates walkthrough actions to the new controller, reducing shell responsibility
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e`, `npm run test:e2e:visual`)
+- Added lightweight Playwright visual regression lane:
+  - new `tests-e2e/visual-shell.spec.mjs` snapshot coverage for topbar, canvas shell, and Issues Drawer severity rows
+  - new script `npm run test:e2e:visual` for targeted UI/CSS regression checks
+  - visual suite tagged `@visual` and excluded from default `test:e2e` / `test:e2e:ci` flows
+  - generated initial visual baselines and verified lane pass (`2 passed`)
+  - documented visual lane in testing strategy and frontend coverage matrix
+- Executed Visual Design System Phase B (low-risk CSS pass):
+  - added shared radius/motion tokens and consistent interactive transitions
+  - normalized core control hit targets to >=32px across editor surfaces
+  - refined topbar/view-control visual grouping and active-state clarity without DOM/selector churn
+  - added `prefers-reduced-motion` fallback for motion accessibility
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Expanded Draw Studio preset import diagnostics UX:
+  - preset import warning details now surface directly in Issues Drawer as individual issue rows
+  - warning rows now include severity tags (`info` / `warning` / `error`) for faster triage
+  - added Issues Drawer action `Dismiss` (`dismiss_draw_preset_warnings`) to clear reviewed preset import warnings
+  - expanded Draw Studio browser E2E coverage to validate warning visibility and dismiss flow
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Added Draw Studio preset schema metadata + import compatibility warnings:
+  - exported/copy preset JSON now includes `schema_id` (`gcs.draw_seed_preset`) and `schema_version` (`1`)
+  - import now logs compatibility warnings for missing schema metadata, newer schema versions, and schema-id mismatch
+  - expanded Draw Studio browser E2E to assert exported preset JSON includes schema metadata
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Added Draw Studio preset copy/share UX:
+  - Draw Studio preset manager now includes `Copy` action for one-click preset sharing
+  - copy flow writes JSON to clipboard when available and always mirrors payload to export textarea as fallback
+  - expanded browser E2E coverage for copy path and duplicate-import conflict behavior
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Hardened Draw Studio preset import conflict handling:
+  - importing preset JSON with an existing name now creates a deterministic suffixed custom preset instead of overwriting
+  - expanded browser E2E to validate duplicate-import conflict behavior remains usable/re-applicable
+  - Playwright local config now reuses existing static server outside CI to avoid local port-collision test failures
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Added Draw Studio preset persistence/import-export manager:
+  - Draw Studio seed panel now includes preset list + actions (`Apply`, `Save`, `Delete`, `Export`, `Import`)
+  - custom presets are persisted in local storage and reloaded safely with normalized point validation
+  - added preset JSON import/export support for reusable preset portability
+  - expanded Draw Studio browser E2E to validate preset save/reapply/export flow
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Added Draw Studio draft presets for faster seed authoring:
+  - Draw Studio seed panel now includes `Cluster`, `Line`, and `Ring` preset buttons
+  - preset actions update mini-canvas draft points + preview list before map apply
+  - draft signature logic now preserves selected preset shape during non-reset interactions
+  - expanded Draw Studio browser E2E to validate preset-driven preview updates
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Upgraded Draw Studio seed flow to editable draft-before-apply:
+  - Draw Studio seed panel now supports draft controls (`Offset X`, `Offset Y`, `Mirror X`) plus per-tile mini-canvas toggling with live preview list
+  - assisted generation now accepts custom draft payloads (`points`) and deterministic options (`baseX`, `baseY`, `mirrorX`) for placement control
+  - added unit coverage for draft-option generation behavior
+  - expanded Draw Studio browser E2E to verify draft preview and transformed apply result
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Added Draw Studio assisted-seed entry point:
+  - new `Draw Studio Seed` panel in right rail with primitive/profile selectors and `Generate To Map` action
+  - wired draw-seed controls through shared assisted generation path to keep behavior consistent with Quick Start
+  - draw-seed generation now syncs assisted profile/primitive selectors and logs draw-source generation events
+  - added browser E2E coverage (`draw studio seed controls generate assisted primitive content`)
+  - updated assisted E2E selectors to exact label matching after adding second assisted control surface
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `35 passed`)
+- Added proactive assisted-guardrail action flow:
+  - Issues Drawer now provides one-click actions to switch assisted profile (`Game Boy`/`NES`/`SNES`) and clean generated props for the current profile
+  - added `cleanupAssistedGenerated(...)` in `app-state` to remove generated assisted props by profile suffix
+  - hardened Issues Drawer click targeting (`closest(...)`) for reliable action handling
+  - added unit coverage (`app-state assisted cleanup removes generated props for selected profile`)
+  - added browser E2E coverage for guardrail action switch + cleanup flows
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `34 passed`)
+- Added assisted-generation guardrail messaging (non-blocking) in UI:
+  - Issues Drawer now surfaces profile-capacity warnings for assisted primitives (`near cap` and `limit reached`)
+  - Quick Start onboarding hint now appends guardrail guidance when the selected assisted profile nears/ hits capacity
+  - guardrails are profile-aware (`Game Boy`, `NES`, `SNES`) and computed from generated prop counts
+  - added browser E2E coverage (`assisted generation guardrails surface near-limit messaging`)
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `32 passed`)
+- Expanded assisted-content v1 to profile-aware generation flow:
+  - Quick Start assisted-content now includes profile selector (`Game Boy`, `NES`, `SNES`)
+  - `generatePrimitiveAsset(...)` now applies deterministic profile tile IDs (`1/2/3`) and profile-tagged entity names
+  - added/updated regression coverage in `apps/desktop/tests/app-state.test.mjs` and `apps/desktop/tests-e2e/smoke.spec.mjs`
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `31 passed`)
+- Added assisted-content v1 seed hook (local deterministic primitive generator):
+  - Quick Start now includes `Assisted Content` controls (`Tree`, `Bush`, `Rock`, `Crate`, `Chest`) with `Generate Primitive`
+  - added `generatePrimitiveAsset(...)` in `app-state` using existing tile/entity command surfaces
+  - generator creates profile-safe primitive footprints + starter prop entities without external services
+  - added unit coverage in `apps/desktop/tests/app-state.test.mjs`
+  - added browser E2E coverage in `apps/desktop/tests-e2e/smoke.spec.mjs`
+  - validated quality gates (`npm run lint`, `npm test`, `npm run test:e2e` -> `31 passed`)
+- Executed Visual Design System Phase A tokenization (`apps/desktop/src/styles.css`):
+  - centralized recurring UI colors into semantic tokens (background/panel/text/border/accent/success/warning/danger/focus)
+  - updated existing components to consume tokenized colors without changing layout or DOM structure
+  - added consistent `:focus-visible` outline styling for keyboard accessibility baseline
+  - validated frontend quality gates remain green (`npm run lint`, `npm test`, `npm run test:e2e` -> `30 passed`)
+- Removed legacy skipped manual drag E2E test and kept deterministic drag-path coverage as canonical:
+  - deleted `test.fixme` manual mouse drag case from `tests-e2e/smoke.spec.mjs`
+  - retained deterministic pointer-event drag pipeline assertion for stable CI drag regression coverage
+- Added `docs/frontend/Visual Design System.md`:
+  - defines initial color/token system, typography/density rules, iconography standards, accessibility baseline, and component visual rules
+  - defines low-risk phased rollout plan (Phase A tokenization now; Phase B structural polish after Sprint 2 runtime acceptance is stable)
+- Updated sprint plan immediate tasks to reference design-system phased rollout timing.
+- Added runtime capability clarity in shell:
+  - topbar runtime mode badge now shows `Web Mode` vs `Desktop Local`
+  - runtime mode is detected centrally from invoke bridge availability and surfaced through app-state
+  - added browser E2E assertion for fallback web-mode badge visibility
+- Added first-pass data-driven guided walkthrough framework:
+  - Quick Start panel now includes walkthrough selector (`Zelda-like Room`, `Chrono-style Town`, `Platformer Room`)
+  - walkthrough controls added (`Start Walkthrough`, `Run Step`) with step status and completion list
+  - walkthrough steps execute via existing onboarding action surface for consistent behavior
+  - walkthrough steps now include plain-English `Why` and `Expected` guidance to teach intent, not just actions
+  - walkthrough rows now include `Show Me` affordances for step-level control discovery
+  - walkthrough now auto-focuses the current step control on start and after each completed step
+  - added anchored walkthrough focus tooltip with `Why` and `Expected` near highlighted controls
+  - walkthrough completion now surfaces explicit next actions (`Playtest`, `Export Preview`, `Start Over`)
+  - added browser E2E coverage validating completion actions execute expected flows
+  - hardened entity drag initialization timing path while retaining known E2E drag flake as tracked issue
+  - added browser E2E coverage for walkthrough start + step progression
+- Added deterministic browser drag-path coverage:
+  - new Playwright test dispatches synthetic pointer events to verify drag pipeline commits entity moves
+  - keeps CI coverage for drag command path while manual mouse-drag E2E remains tracked as flaky
+- Added first-pass UI profile toggle for beginner clarity:
+  - topbar profile selector (`Builder UI`, `Beginner UI`)
+  - beginner mode now hides advanced map controls and advanced right-panel tooling (Runtime Watch, Script Lab)
+  - profile choice is persisted in local storage for consistent startup behavior
+  - added browser E2E coverage for profile toggle visibility behavior
+- Added first-pass Issues Drawer recovery actions:
+  - runtime/open/save/playtest failures now surface contextual recovery buttons (`Reload Editor State`, `Retry Open`, `Retry Save`, `Restart Playtest`)
+  - issues panel click handling now routes both script auto-fixes and runtime recovery actions
+  - browser E2E now validates runtime error surfaces a recovery action button
+- Added map/tile editor zoom ergonomics:
+  - new map zoom controls in editor toolbar (`Map Fit`, `Map 1x`, `Map 2x`, `Map 3x`)
+  - map layer scaling now preserves interaction accuracy (paint/select/drag pointer coordinates are zoom-aware)
+  - map zoom now scales by authored content bounds for better readability while editing
+  - temporarily marked one browser E2E entity-drag case as `fixme` pending drag/zoom harmonization
+- Updated product docs for learning and accessibility of creation workflows:
+  - design doc now includes learn-by-building walkthrough requirements and assisted-generation guardrails
+  - sprint plan and tooling matrix now track clone-style tutorial projects and procedural starter-asset generation
+- Improved guided-tour completion UX reliability in `ui-shell`:
+  - tour-complete action buttons now reflect state (`Playtest Running`, `Export Preview Ready`) and disable when already satisfied
+  - tour summary now surfaces inline status feedback after quick actions
+  - canvas map interaction handlers now ignore `#help-overlay` targets so help buttons do not conflict with map click/marquee behavior
+  - maintained green frontend quality gates after update (`npm run lint`, `npm run test:e2e` -> `25/25`)
+- Hardened scripting graph validation in `script-core`:
+  - added cycle detection (`cycle_detected`) using topological validation
+  - added `empty_node_id`, `duplicate_node_id`, and `duplicate_edge` validation errors
+  - added unit tests for cycle and duplicate/empty graph scenarios
+- Hardened playtest runtime trace buffering in `gcs-desktop`:
+  - switched `editor_runtime` trace storage from `Vec` to `VecDeque`
+  - removed O(n) front-removal in hot path (`remove(0)` -> `pop_front()`)
+  - introduced shared `PLAYTEST_TRACE_LIMIT` constant for stable retention behavior
+  - replaced playtest simulation magic numbers with named constants (`PLAYTEST_FPS`, frame thresholds/intervals)
+  - added FIFO retention-order regression test for bounded trace history
+  - added direct runtime breakpoint/watch regression test (`item_pickup` pauses playtest, captures hit, updates watch state)
+  - added direct runtime tests for inactive tick field updates and quest-breakpoint resume behavior
+- Hardened frontend resilience paths:
+  - `event-bus` now catches per-listener failures without aborting sibling handlers
+  - `app-state` async commands now use guarded error capture and emit `app:error`
+  - `app-state` now exposes `reportError(...)` for non-guarded runtime/global error routing
+  - `project-api` now reports explicit malformed JSON invoke-response errors
+  - `ui-shell` now installs global browser error handlers (`error`, `unhandledrejection`) and routes failures into Issues Drawer
+  - `ui-shell` now re-renders immediately on `app:error` so runtime failures are visible without further user interaction
+  - added frontend tests for error-path handling and listener isolation
+  - added browser E2E assertions for both global `window:error` and `window:unhandledrejection` surfacing paths
+- Added starter-template "New Project" UX slice:
+  - new topbar starter-template selector (`RPG`, `Platformer`, `Puzzle`, `Blank`)
+  - new backend invoke command `map_reset` for clean project bootstrapping
+  - `app-state` now supports `newProjectFromTemplate(...)` to seed map tiles/entities
+  - `ui-shell` now applies starter script templates automatically by selected starter type
+  - added unit and browser E2E coverage for template bootstrapping and map reset behavior
+- Added first-pass guided onboarding checklist in the shell:
+  - new `Quick Start` panel tracks first playable loop milestones (template/new, entity, tile, playtest, save)
+  - checklist state updates live from editor/playtest/save events
+  - checklist now surfaces inline action affordances for pending steps (next-step shortcuts)
+  - checklist now provides contextual tip text for the next pending action and expected outcome
+  - added browser E2E coverage for checklist progression to completion
+- Added first-pass in-app Help overlay for core workflows:
+  - topbar `Help` toggle now opens contextual guidance for Map vs Playtest mode
+  - help content switches live with editor/playtest state
+  - added browser E2E coverage for help-overlay context switching
+  - added guided tour controls (`Start Tour`, `Back`, `Next`, `Stop`) with step-by-step control highlighting
+  - added `Do It` guided-tour action to execute the current step and advance focus
+  - added tour-complete summary state with next actions (`Playtest Again`, `Export Preview`)
+  - added browser E2E coverage for guided tour progression and focus-highlighting behavior
+
+## 2026-02-13
+- Added external review intake and execution planning artifacts:
+  - new `docs/reviews/Claude Review Action Plan.md` with accepted priorities and hardening checklist
+  - updated sprint immediate tasks around Hardening Wave 1 (script cycles, frontend error containment, runtime test depth)
+  - updated testing strategy/living plan with explicit error-path and cycle-detection coverage requirements
+  - updated known issues and architecture overview to reflect active reliability gaps
+  - expanded tooling matrix with first-5-minutes game UX priorities (starter templates + guided playable flow)
+- Added first end-to-end scripting validation command path:
+  - new backend invoke command `script_validate` in `apps/desktop/src-tauri/src/invoke_api.rs`
+  - desktop crate now links `script-core` for validation reports
+  - frontend `project-api` now exposes `validateScriptGraph(...)` with web-fallback parity checks
+  - added backend and frontend tests for missing-node validation behavior
+- Added Script Lab UI prototype for scripting validation:
+  - right-panel Script Lab (`apps/desktop/src/index.html`) with graph JSON input and validate button
+  - `app-state` now tracks script validation output and emits `script:validated`
+  - `ui-shell` now routes script validation issues into Issues Drawer for immediate feedback
+- Added browser and QA coverage for Script Lab workflow:
+  - new Playwright smoke assertion validates Script Lab issue reporting (`tests-e2e/smoke.spec.mjs`)
+  - manual QA running doc now includes Script Lab validation steps and expected outcomes
+- Improved Script Lab template ergonomics:
+  - added built-in script templates with one-click apply (`Starter Event`, `Quest Trigger`, `Item Pickup`)
+  - added custom template save/delete support using local storage for quick reuse
+  - added browser E2E coverage for template apply/save workflow
+- Added Issues Drawer one-click script autofix:
+  - script validation issues now render `Auto-fix` actions for missing source/target nodes
+  - autofix updates Script Lab graph JSON and re-runs validation immediately
+  - browser E2E currently verifies auto-fix CTA visibility for missing-target errors
+- Added future-proofing documentation for long-term scope:
+  - `docs/roadmap/2D-to-3D Evolution Plan.md` with phased expansion and boundary guardrails
+  - tooling matrix now includes explicit Engine Evolution capability section
+  - sprint backlog now tracks 2D->3D boundary prep as v1+ work
+- Added scripting UX/translation planning artifact:
+  - `docs/scripting/Scripting UX and Translation Assistant.md`
+  - ADR-005 now references validated translation assistant rollout in v1+
+- Added scripting architecture decision and roadmap alignment:
+  - new ADR `docs/ADR-005-scripting-engine.md` (hybrid Event Graph + Rhai strategy)
+  - updated sprint plan deliverables/acceptance criteria for scripting foundation and Event Graph MVP
+  - updated architecture overview and tooling matrix with scripting, auto-tiling, and adaptive music planning
+  - added `crates/script-core` scaffold with script graph IR + validation baseline tests
+- Expanded export artifact contract with assets manifest accounting:
+  - native export now emits `assets/manifest.json` and includes it in `bundle.json`
+  - fallback JS artifact builder now emits the same manifest contract for parity tooling
+  - browser parity test now validates assets-manifest schema/profile/asset-count fields
+  - export invoke/CLI report now includes explicit `asset_count` in `ExportBundleReport`
+- Added contributor-facing docs for faster onboarding and cleaner implementation flow:
+  - `docs/ARCHITECTURE_OVERVIEW.md`
+  - `docs/DEVELOPMENT_WORKFLOW.md`
+  - `docs/GLOSSARY.md`
+- Updated README quick links to include architecture/workflow/glossary references.
+- Updated ADR statuses to accepted for implemented foundations:
+  - `docs/ADR-001-runtime-boundary.md`
+  - `docs/ADR-002-command-bus.md`
+  - `docs/ADR-003-schema-migration.md`
+- Fixed frontend-to-Tauri invoke contract so desktop runtime uses the registered `invoke_command` bridge with JSON payload forwarding.
+- Hardened fallback behavior: frontend now falls back only when Tauri is unavailable, and surfaces real backend errors instead of silently downgrading.
+- Refined browser viewport scene-signature assertions to sample deterministic background/tile/entity points.
+- Added browser E2E multi-tab/session isolation coverage to validate per-page editor state separation.
+- Added Playwright CI stability-window criteria to `docs/testing/Testing Plan (Living).md` for gate hardening.
+- Added first-pass preview/export parity harness:
+  - `apps/desktop/src/viewport-signature.js` shared deterministic signature model
+  - `apps/desktop/tests/fixtures/viewport-golden-scenes.json` golden fixtures
+  - `apps/desktop/tests/viewport-parity.test.mjs` parity regression test
+  - Playwright viewport test now validates exact expected signatures from the shared model
+- Improved manual-usage issues from QA pass:
+  - responsive layout behavior tuned for smaller window sizes (`apps/desktop/src/styles.css`)
+  - playtest viewport zoom presets added (`Fit`, `2x`, `3x`, `4x`) while keeping GB internal resolution (`apps/desktop/src/styles.css`, `apps/desktop/src/ui-shell.js`)
+  - paint/erase brush sweeps now commit as batch commands so one undo reverts one sweep (`map_paint_tiles` / `map_erase_tiles`)
+  - playtest loop primes first tick window to reduce perceived startup lag
+- Added tile-stroke undo regression coverage and updated command/testing docs accordingly.
+- Added browser E2E coverage for playtest viewport zoom presets.
+- Added desktop-runtime contract coverage in frontend API tests:
+  - verifies `window.__TAURI__.core.invoke` calls `invoke_command` with expected payload envelope
+  - verifies backend errors are surfaced instead of silently falling back
+- Added CI Playwright stability instrumentation:
+  - `apps/desktop/package.json` includes `test:e2e:ci` JSON-report command
+  - `.github/workflows/ci.yml` now uploads Playwright artifacts (`test-results` / `playwright-report`) for all runs
+  - testing docs now define daily stability-window metric collection workflow
+- Added browser-driven desktop-runtime E2E coverage:
+  - new Playwright spec `apps/desktop/tests-e2e/desktop-runtime.spec.mjs`
+  - injects `window.__TAURI__` invoke bridge and validates real UI flow uses `invoke_command`
+  - complements Node-level desktop invoke contract tests with browser execution coverage
+- Added first-pass export artifact drift coverage:
+  - new export artifact helper `apps/desktop/src/export-artifact.js`
+  - new test `apps/desktop/tests/export-artifact-parity.test.mjs`
+  - parity now validates preview signatures against persisted export artifact files for golden scenes
+- Added browser-level pixel-exact export parity checks:
+  - new export preview runtime artifact page `apps/desktop/src/export-preview.html`
+  - new export runtime renderer `apps/desktop/src/export-preview-runtime.js`
+  - shared scenes `apps/desktop/src/export-preview-fixtures.js`
+  - new Playwright test `apps/desktop/tests-e2e/export-parity.spec.mjs` compares full RGBA buffers against expected scene output
+- Promoted export parity to packaged artifact verification:
+  - new artifact build script `apps/desktop/scripts/build-export-artifacts.mjs`
+  - static server now mounts `/export-artifacts/*` path for packaged runtime checks
+  - `test:e2e` and `test:e2e:ci` now build export artifacts before running Playwright
+- Added native Rust export pipeline baseline for preview artifacts:
+  - `crates/export-core` now builds HTML5 preview artifact bundles (`index.html`, `runtime.js`, `scenes.json`)
+  - new desktop invoke command `export_preview_html5` in `apps/desktop/src-tauri/src/invoke_api.rs`
+  - new CLI command `gcs-desktop export-preview <output_dir> [--debug]` in `apps/desktop/src-tauri/src/main.rs`
+  - added export-core crate tests and desktop dispatch test for native export output generation
+  - added npm helper script `build:export:preview:native` in `apps/desktop/package.json`
+- Switched browser parity build default to native export-core path:
+  - `apps/desktop` `build:export:preview` now calls `gcs-desktop export-preview ...`
+  - CI `test:e2e:ci` now exercises native Rust-built packaged artifacts by default
+  - JS build script retained as fallback via `build:export:preview:js`
+- Expanded native export parity fixture breadth:
+  - native export-core scene set now includes multi-entity/multi-tile and edge-clamp cases
+  - browser export parity test now loads scene list from packaged artifact `scenes.json` directly
+  - parity checks scale with native export scene-set updates without stale fixture coupling
+- Added profile-aware native export artifact contract:
+  - native export now accepts `game_boy` / `nes` / `snes` profile options
+  - export artifacts now include `metadata.json` (`profile`, `mode`, `scene_count`)
+  - browser parity test now validates metadata contract in addition to pixel-exact buffer parity
+  - desktop invoke payload and CLI usage updated for profile selection
+- Added Playwright stability summary automation:
+  - new parser script `apps/desktop/scripts/playwright-metrics.mjs`
+  - new npm command `test:e2e:metrics` to convert JSON report into daily metrics markdown
+  - CI now runs metrics summary generation after browser E2E and includes output in artifacts
+  - flaky log daily summary table can be auto-updated from artifact metrics
+- Added native Tauri-runtime CI gate on Windows:
+  - `.github/workflows/ci.yml` now includes `verify-tauri-runtime` job
+  - validates `tauri-runtime` feature compile path
+  - runs invoke smoke command and asserts expected editor payload output
+  - invoke smoke now uses built binary invocation with stable JSON quoting to avoid shell-mangling
+- Expanded native runtime CI smoke to export profiles:
+  - `verify-tauri-runtime` job now builds NES and SNES export bundles via native CLI
+  - validates profile metadata contract (`metadata.json`) for both profile variants
+- Added profile-specific browser export parity checks:
+  - new npm commands `test:e2e:export:nes` and `test:e2e:export:snes`
+  - `verify-tauri-runtime` job now executes NES/SNES pixel-parity Playwright checks
+  - export parity test now validates profile viewport contract (`profile` -> `width/height`) across scenes
+- Added export bundle manifest contract:
+  - native export artifacts now include `bundle.json` describing entrypoint/runtime/scenes/metadata links
+  - export parity tests now assert `bundle.json` structure and consistency with metadata
+  - desktop invoke export dispatch test updated for `bundle.json` output presence
+- Added running manual QA guide with plain-English step-by-step walkthroughs:
+  - `docs/testing/Manual QA (Running).md`
+- Linked manual QA guide from `README.md`.
+- Updated map toolbar behavior so `Reselect` remains available when current selection is empty (except during playtest mode).
+- Updated CI npm cache path to lockfile (`apps/desktop/package-lock.json`) for consistent dependency caching.
+- Added `/target-tauri/` to root `.gitignore` to avoid build artifact noise.
+- Added README "What We Are Building" summary aligned to v1.1 North Star and core guardrails.
+- Added repo hygiene and frontend tooling baseline:
+  - `.gitignore`
+  - `LICENSE` (MIT)
+  - `apps/desktop` ESLint + Prettier setup with lint/format scripts
+  - CI updated to install frontend deps and run lint + format checks
+- Added frontend type safety planning doc: `docs/frontend/Type Safety Plan.md`
+- Promoted browser E2E to CI verification:
+  - `.github/workflows/ci.yml` now installs Playwright Chromium and runs `npm run test:e2e`
+- Added Tauri runtime entrypoint registration path:
+  - `apps/desktop/src-tauri/src/main.rs` now boots Tauri runtime (when enabled) with `invoke_command` handler
+  - added `apps/desktop/src-tauri/build.rs` + `apps/desktop/src-tauri/tauri.conf.json`
+  - added optional Tauri dependencies/feature wiring in `apps/desktop/src-tauri/Cargo.toml`
+- Added Playwright Phase 0 scaffold:
+  - `apps/desktop/playwright.config.mjs`
+  - `apps/desktop/scripts/static-server.mjs`
+  - `apps/desktop/tests-e2e/smoke.spec.mjs`
+  - `apps/desktop` `test:e2e` scripts + `@playwright/test` dev dependency
+- Expanded Playwright E2E coverage:
+  - map move-command interaction updates coordinates
+  - real entity drag interaction updates coordinates
+  - keyboard shortcuts for tool switching and playtest toggle
+  - trace/watch filter interaction scenarios
+  - viewport multi-point scene signature assertion
+  - local Playwright run passing (8/8)
+- Added selected-entity watch buckets in runtime/service/frontend payloads.
+- Added UI debug helper module + smoke tests for trace/watch filter logic.
+- Added operations docs:
+  - `docs/CHANGELOG.md`
+  - `docs/KNOWN_ISSUES.md`
+  - `docs/commands/Command Surface.md`
+  - `docs/testing/Flaky Test Log.md`
+- Added playtest breakpoint scaffold (event-based pause on tick/item/quest events).
+- Added runtime watch grouping (flags/variables/inventory) and watch filters in UI.
+- Added trace dock filter chips and clickable event-kind chips.
+- Added frontend smoke tests (`apps/desktop/tests/*.test.mjs`) and test reset hooks.
+- Added testing docs:
+  - `docs/testing/Test Strategy.md`
+  - `docs/testing/Frontend Smoke Coverage.md`
+  - `docs/testing/Testing Plan (Living).md`
+  - `docs/testing/QA Checklist.md`
+- Marked ADR-004 (Playtest Debugger Boundary) as accepted.
+
+## 2026-02-12
+- Bootstrapped workspace architecture and sprint/ADR documentation.
+- Added project safety backbone in `project-core` (atomic save, backups, migration flow).
+- Added command bus foundation and context-aware undo/redo.
+- Added map editor vertical slice (entity + tile operations) in runtime and frontend shell.
+- Added playtest shell controls, fixed-step tick wiring, diagnostics overlays, and trace stream scaffolding.

@@ -1,0 +1,25 @@
+{
+  "entityId": "ent_sword",
+  "name": "Sword",
+  "tags": ["prop", "weapon"],
+  "transform": {
+    "position": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "scale":    { "x": 1, "y": 1, "z": 1 }
+  },
+  "components": [
+    {
+      "type": "SpriteRenderer",
+      "sprite": { "assetId": "asset_sword_sheet", "subId": "idle_0" }
+    }
+  ],
+  "slots": [
+    {
+      "slotName":       "grip",
+      "slotType":       "prop",
+      "parentEntityId": "ent_player",
+      "anchorName":     "hand_r",
+      "occlusionHint":  "in-front"
+    }
+  ]
+}

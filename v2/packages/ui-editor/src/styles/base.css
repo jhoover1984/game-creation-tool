@@ -1,0 +1,56 @@
+/* =====================================================================
+   BASE -- element resets and foundational shell structure
+   UI-VISUAL-002 (extracted from app.html)
+   ===================================================================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+header {
+  background: var(--bg-raised);
+  padding: var(--sp-2) var(--sp-4);
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+header h1 { font-size: var(--text-lg); margin-right: auto; }
+.playtest-hud {
+  margin-left: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+button {
+  background: var(--bg-accent);
+  color: var(--text-primary);
+  border: 1px solid var(--border-control);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+button:hover:not(:disabled) { background: var(--bg-accent-hover); }
+.toolbar {
+  background: var(--bg-raised);
+  padding: var(--sp-1) var(--sp-4);
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.toolbar label { display: flex; gap: var(--sp-1); align-items: center; }
+footer {
+  background: var(--bg-raised);
+  padding: var(--sp-1) var(--sp-4);
+  font-size: var(--text-xs);
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: var(--sp-4);
+}

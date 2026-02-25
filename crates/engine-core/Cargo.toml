@@ -1,0 +1,11 @@
+﻿[package]
+name = "engine-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+command-core = { path = "../command-core" }
+
+[dev-dependencies]
+serde_json.workspace = true

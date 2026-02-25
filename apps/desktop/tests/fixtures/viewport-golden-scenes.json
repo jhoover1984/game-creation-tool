@@ -1,0 +1,47 @@
+[
+  {
+    "name": "single_tile_single_entity_frame0",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        { "x": 0, "y": 0, "tile_id": 1 }
+      ],
+      "entities": [
+        { "id": 1, "name": "Entity 1", "position": { "x": 16, "y": 16 } }
+      ],
+      "playtest": { "frame": 0 }
+    },
+    "points": [
+      { "id": "backgroundFar", "x": 123, "y": 119 },
+      { "id": "backgroundNear", "x": 37, "y": 45 },
+      { "id": "paintedTile", "x": 4, "y": 4 },
+      { "id": "entityCore", "x": 20, "y": 20 }
+    ]
+  },
+  {
+    "name": "single_tile_single_entity_frame20",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        { "x": 0, "y": 0, "tile_id": 1 }
+      ],
+      "entities": [
+        { "id": 1, "name": "Entity 1", "position": { "x": 16, "y": 16 } }
+      ],
+      "playtest": { "frame": 20 }
+    },
+    "points": [
+      { "id": "backgroundFar", "x": 123, "y": 119 },
+      { "id": "paintedTile", "x": 4, "y": 4 },
+      { "id": "entityCore", "x": 20, "y": 20 }
+    ]
+  }
+]

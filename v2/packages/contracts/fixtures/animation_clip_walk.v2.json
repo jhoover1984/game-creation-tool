@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "2.0.0",
+  "assetId": "clip_walk",
+  "name": "Walk",
+  "fps": 12,
+  "loop": true,
+  "frames": [
+    {
+      "sprite": { "assetId": "asset_player_sheet", "subId": "walk_0" },
+      "duration": 0.0833,
+      "origin": { "x": 8, "y": 8 }
+    },
+    {
+      "sprite": { "assetId": "asset_player_sheet", "subId": "walk_1" },
+      "duration": 0.0833,
+      "origin": { "x": 8, "y": 8 }
+    }
+  ],
+  "anchors": {
+    "hand_r": [
+      { "frame": 0, "pos": { "x": 11, "y": 7 } },
+      { "frame": 1, "pos": { "x": 12, "y": 7 } }
+    ]
+  },
+  "events": [
+    { "frame": 0, "name": "footstep" }
+  ]
+}

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GCS v2 -- Animation Studio</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      font-size: 13px;
+    }
+    header {
+      background: #16213e;
+      padding: 8px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+    header h1 { font-size: 14px; margin-right: auto; }
+    button {
+      background: #0f3460;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    button:hover { background: #1a5276; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.active { background: #1a5276; border-color: #5dade2; }
+    .layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    .panel {
+      background: #16213e;
+      border-right: 1px solid #333;
+      padding: 8px;
+      overflow-y: auto;
+    }
+    .panel h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .panel-clips { width: 200px; }
+    .panel-props { width: 240px; }
+    .preview-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .clip-item {
+      padding: 6px 8px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .clip-item:hover { border-color: #5dade2; }
+    .clip-item.selected { background: #0f3460; border-color: #5dade2; }
+    .clip-item .clip-name { font-weight: 600; }
+    .clip-item .clip-meta { font-size: 11px; color: #888; }
+    .clip-item .btn-delete {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+    }
+    .form-row {
+      margin-bottom: 8px;
+    }
+    .form-row label {
+      display: block;
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 2px;
+    }
+    .form-row input, .form-row select {
+      width: 100%;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 4px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .timeline {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 8px;
+      width: 80%;
+      max-width: 600px;
+    }
+    .timeline-frames {
+      display: flex;
+      gap: 2px;
+      height: 48px;
+      align-items: end;
+    }
+    .frame-cell {
+      flex: 1;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 2px;
+      min-height: 32px;
+      position: relative;
+      cursor: pointer;
+    }
+    .frame-cell.active {
+      background: #0f3460;
+      border-color: #5dade2;
+    }
+    .frame-cell .frame-num {
+      position: absolute;
+      bottom: 1px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: #888;
+    }
+    .preview-canvas {
+      border: 2px solid #444;
+      background: #111;
+      image-rendering: pixelated;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .controls .frame-info {
+      font-size: 11px;
+      color: #888;
+      min-width: 100px;
+      text-align: center;
+    }
+    .transition-item {
+      padding: 4px 6px;
+      border: 1px solid #333;
+      border-radius: 3px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .transition-item .arrow { color: #5dade2; margin: 0 4px; }
+    footer {
+      background: #16213e;
+      padding: 4px 16px;
+      font-size: 11px;
+      border-top: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Animation Studio</h1>
+    <button id="btn-add-clip">+ Clip</button>
+    <button id="btn-add-transition">+ Transition</button>
+    <button id="btn-back">Back to Editor</button>
+  </header>
+  <div class="layout">
+    <!-- Clip list panel -->
+    <div class="panel panel-clips">
+      <h2>Clips</h2>
+      <div id="clip-list"></div>
+    </div>
+
+    <!-- Preview area -->
+    <div class="preview-area">
+      <canvas id="preview-canvas" class="preview-canvas" width="128" height="128"></canvas>
+      <div class="controls">
+        <button id="btn-play">Play</button>
+        <button id="btn-stop">Stop</button>
+        <span id="frame-info" class="frame-info">Frame 0 / 0</span>
+      </div>
+      <div class="timeline">
+        <div id="timeline-frames" class="timeline-frames"></div>
+      </div>
+    </div>
+
+    <!-- Properties panel -->
+    <div class="panel panel-props">
+      <h2>Clip Properties</h2>
+      <div id="clip-props">
+        <div class="form-row">
+          <label>Name</label>
+          <input id="prop-name" type="text" placeholder="clip name">
+        </div>
+        <div class="form-row">
+          <label>Frame Count</label>
+          <input id="prop-frames" type="number" value="4" min="1" max="64">
+        </div>
+        <div class="form-row">
+          <label>FPS</label>
+          <input id="prop-fps" type="number" value="10" min="1" max="60">
+        </div>
+        <div class="form-row">
+          <label>Loop Mode</label>
+          <select id="prop-loop">
+            <option value="loop">Loop</option>
+            <option value="once">Once</option>
+            <option value="pingpong">Ping-Pong</option>
+          </select>
+        </div>
+      </div>
+
+      <h2 style="margin-top: 16px;">Transitions</h2>
+      <div id="transition-list"></div>
+    </div>
+  </div>
+  <footer>
+    <span id="status">No clip selected</span>
+  </footer>
+
+  <script type="module">
+    // ---- AnimationPlayer (inline mirror of runtime-web) ----
+    function newPlayback(clip) {
+      return { clipName: clip.name, currentFrame: 0, elapsed: 0, finished: false, direction: 1 };
+    }
+
+    function tickPlayback(state, clip, dt) {
+      if (state.finished) return state.currentFrame;
+      state.elapsed += dt;
+      const fd = 1 / clip.fps;
+      while (state.elapsed >= fd) {
+        state.elapsed -= fd;
+        const next = state.currentFrame + state.direction;
+        if (clip.loopMode === 'once') {
+          if (next >= clip.frameCount) { state.currentFrame = clip.frameCount - 1; state.finished = true; return state.currentFrame; }
+          state.currentFrame = next;
+        } else if (clip.loopMode === 'loop') {
+          state.currentFrame = ((next % clip.frameCount) + clip.frameCount) % clip.frameCount;
+        } else {
+          if (next >= clip.frameCount) { state.direction = -1; state.currentFrame = Math.max(0, clip.frameCount - 2); }
+          else if (next < 0) { state.direction = 1; state.currentFrame = Math.min(1, clip.frameCount - 1); }
+          else state.currentFrame = next;
+        }
+      }
+      return state.currentFrame;
+    }
+
+    // ---- State ----
+    let clips = [];
+    let transitions = [];
+    let selectedClipId = null;
+    let playback = null;
+    let playing = false;
+    let animFrame = null;
+    let lastTime = 0;
+
+    const clipList = document.getElementById('clip-list');
+    const transitionList = document.getElementById('transition-list');
+    const timelineFrames = document.getElementById('timeline-frames');
+    const previewCanvas = document.getElementById('preview-canvas');
+    const previewCtx = previewCanvas.getContext('2d');
+    const frameInfo = document.getElementById('frame-info');
+    const status = document.getElementById('status');
+
+    let nextId = 1;
+    function makeId() { return `clip-${nextId++}`; }
+
+    // ---- Rendering ----
+    function renderClipList() {
+      clipList.innerHTML = '';
+      for (const clip of clips) {
+        const div = document.createElement('div');
+        div.className = `clip-item${clip.id === selectedClipId ? ' selected' : ''}`;
+        div.innerHTML = `
+          <div>
+            <div class="clip-name">${clip.name}</div>
+            <div class="clip-meta">${clip.frameCount}f @ ${clip.fps}fps -- ${clip.loopMode}</div>
+          </div>
+          <span class="btn-delete" data-id="${clip.id}">&times;</span>
+        `;
+        div.addEventListener('click', (e) => {
+          if (e.target.classList.contains('btn-delete')) {
+            clips = clips.filter(c => c.id !== e.target.dataset.id);
+            transitions = transitions.filter(t => t.fromClip !== clip.name && t.toClip !== clip.name);
+            if (selectedClipId === clip.id) selectedClipId = null;
+            stopPlayback();
+            renderAll();
+            return;
+          }
+          selectClip(clip.id);
+        });
+        clipList.appendChild(div);
+      }
+    }
+
+    function renderTransitions() {
+      transitionList.innerHTML = '';
+      for (let i = 0; i < transitions.length; i++) {
+        const t = transitions[i];
+        const condText = t.condition.type === 'onComplete' ? 'on complete'
+          : t.condition.type === 'onTrigger' ? `trigger: ${t.condition.trigger}`
+          : `${t.condition.param} > ${t.condition.above}`;
+        const div = document.createElement('div');
+        div.className = 'transition-item';
+        div.innerHTML = `
+          <span>${t.fromClip}<span class="arrow">-></span>${t.toClip} (${condText})</span>
+          <span class="btn-delete" data-idx="${i}" style="color:#e74c3c;cursor:pointer">&times;</span>
+        `;
+        div.querySelector('.btn-delete').addEventListener('click', () => {
+          transitions.splice(i, 1);
+          renderTransitions();
+        });
+        transitionList.appendChild(div);
+      }
+    }
+
+    function renderTimeline() {
+      timelineFrames.innerHTML = '';
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (!clip) return;
+      for (let i = 0; i < clip.frameCount; i++) {
+        const cell = document.createElement('div');
+        cell.className = `frame-cell${playback && playback.currentFrame === i ? ' active' : ''}`;
+        cell.innerHTML = `<span class="frame-num">${i}</span>`;
+        timelineFrames.appendChild(cell);
+      }
+      frameInfo.textContent = `Frame ${playback ? playback.currentFrame : 0} / ${clip.frameCount}`;
+    }
+
+    function renderPreview() {
+      const ctx = previewCtx;
+      const w = previewCanvas.width;
+      const h = previewCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, w, h);
+
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (!clip || !playback) {
+        ctx.fillStyle = '#444';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('No clip selected', w / 2, h / 2);
+        return;
+      }
+
+      // Draw a colored rectangle that shifts hue per frame (placeholder for sprite)
+      const frame = playback.currentFrame;
+      const hue = (frame * 60) % 360;
+      const size = 64;
+      const x = (w - size) / 2;
+      const y = (h - size) / 2;
+
+      ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+      ctx.fillRect(x, y, size, size);
+
+      // Frame indicator
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`F${frame}`, w / 2, y + size / 2 + 6);
+
+      // Loop mode indicator
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#888';
+      ctx.fillText(clip.loopMode, w / 2, h - 8);
+    }
+
+    function renderAll() {
+      renderClipList();
+      renderTransitions();
+      renderTimeline();
+      renderPreview();
+      updateProps();
+      updateStatus();
+    }
+
+    function updateProps() {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (!clip) return;
+      document.getElementById('prop-name').value = clip.name;
+      document.getElementById('prop-frames').value = clip.frameCount;
+      document.getElementById('prop-fps').value = clip.fps;
+      document.getElementById('prop-loop').value = clip.loopMode;
+    }
+
+    function updateStatus() {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (!clip) {
+        status.textContent = `${clips.length} clip(s), ${transitions.length} transition(s)`;
+      } else {
+        status.textContent = `Editing: ${clip.name} -- ${playing ? 'playing' : 'stopped'}`;
+      }
+    }
+
+    // ---- Selection ----
+    function selectClip(id) {
+      selectedClipId = id;
+      const clip = clips.find(c => c.id === id);
+      if (clip) playback = newPlayback(clip);
+      stopPlayback();
+      renderAll();
+    }
+
+    // ---- Playback ----
+    function startPlayback() {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (!clip) return;
+      if (!playback) playback = newPlayback(clip);
+      playback.finished = false;
+      playback.currentFrame = 0;
+      playback.elapsed = 0;
+      playback.direction = 1;
+      playing = true;
+      lastTime = performance.now();
+      tick();
+      renderAll();
+    }
+
+    function stopPlayback() {
+      playing = false;
+      if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+      renderAll();
+    }
+
+    function tick() {
+      if (!playing) return;
+      const now = performance.now();
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (clip && playback) {
+        tickPlayback(playback, clip, dt);
+        // Check transitions
+        const currentName = playback.clipName;
+        const fired = transitions.find(t =>
+          t.fromClip === currentName &&
+          t.condition.type === 'onComplete' && playback.finished
+        );
+        if (fired) {
+          const nextClip = clips.find(c => c.name === fired.toClip);
+          if (nextClip) {
+            selectedClipId = nextClip.id;
+            playback = newPlayback(nextClip);
+          }
+        }
+      }
+
+      renderTimeline();
+      renderPreview();
+      updateStatus();
+      animFrame = requestAnimationFrame(tick);
+    }
+
+    // ---- Events ----
+    document.getElementById('btn-add-clip').addEventListener('click', () => {
+      const id = makeId();
+      const name = `Clip ${clips.length + 1}`;
+      clips.push({ id, name, frameCount: 4, fps: 10, loopMode: 'loop' });
+      selectClip(id);
+    });
+
+    document.getElementById('btn-add-transition').addEventListener('click', () => {
+      if (clips.length < 2) { status.textContent = 'Need at least 2 clips for transitions'; return; }
+      const from = clips.find(c => c.id === selectedClipId) || clips[0];
+      const to = clips.find(c => c.id !== from.id) || clips[1];
+      transitions.push({ fromClip: from.name, toClip: to.name, condition: { type: 'onComplete' } });
+      renderTransitions();
+      updateStatus();
+    });
+
+    document.getElementById('btn-play').addEventListener('click', startPlayback);
+    document.getElementById('btn-stop').addEventListener('click', stopPlayback);
+
+    // Property changes
+    document.getElementById('prop-name').addEventListener('input', (e) => {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (!clip) return;
+      const oldName = clip.name;
+      clip.name = e.target.value;
+      // Update transitions referencing old name
+      for (const t of transitions) {
+        if (t.fromClip === oldName) t.fromClip = clip.name;
+        if (t.toClip === oldName) t.toClip = clip.name;
+      }
+      if (playback) playback.clipName = clip.name;
+      renderClipList();
+      renderTransitions();
+    });
+
+    document.getElementById('prop-frames').addEventListener('input', (e) => {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (clip) { clip.frameCount = Math.max(1, parseInt(e.target.value) || 1); renderTimeline(); }
+    });
+
+    document.getElementById('prop-fps').addEventListener('input', (e) => {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (clip) clip.fps = Math.max(1, parseInt(e.target.value) || 1);
+    });
+
+    document.getElementById('prop-loop').addEventListener('change', (e) => {
+      const clip = clips.find(c => c.id === selectedClipId);
+      if (clip) { clip.loopMode = e.target.value; renderClipList(); }
+    });
+
+    // Initial render
+    renderAll();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/story.effects.v2.json",
+  "title": "Story Effects V2",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["kind"],
+    "properties": {
+      "kind": {
+        "type": "string",
+        "enum": ["setFlag", "addItem", "modifyRep", "spawnEntity", "emitRumor"]
+      },
+      "key": { "type": "string" },
+      "value": { "type": ["number", "string", "boolean"] },
+      "asset": { "$ref": "common.v2.json#/$defs/ResourceRef" },
+      "amount": { "type": "integer" }
+    }
+  }
+}

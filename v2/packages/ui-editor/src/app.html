@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GCS v2 - Editor</title>
+  <!-- Stylesheet load order is deterministic: tokens -> base -> layout -> components -> workspaces -> accessibility -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/workspaces.css">
+  <link rel="stylesheet" href="styles/accessibility.css">
+</head>
+<body data-mode="beginner" data-density="comfort">
+  <div id="dashboard-overlay" class="dashboard-overlay"></div>
+
+  <header>
+    <h1>GCS v2 Editor</h1>
+    <button id="btn-new">New</button>
+    <button id="btn-save">Save</button>
+    <button id="btn-load">Load</button>
+    <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+    <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>Redo</button>
+    <button id="btn-play">Play</button>
+    <button id="btn-pause">Pause/Resume</button>
+    <button id="btn-step">Step</button>
+    <button id="btn-interact">Interact</button>
+    <button id="btn-add-starter" class="btn btn--primary" title="Add a starter scene with ground tiles and a player">Add Starter Scene</button>
+    <button id="btn-add-player" class="btn btn--secondary" title="Create and select a player entity">Add Player</button>
+    <button id="btn-zoom-reset" title="Fit to Map">Fit</button>
+    <span id="playtest-hud" class="playtest-hud" aria-live="polite">Playtest: stopped</span>
+  </header>
+
+  <div class="toolbar">
+    <label title="Select the active painting tool">Tool:
+      <select id="tool-select">
+        <option value="select">Select</option>
+        <option value="paint">Paint Tile</option>
+        <option value="erase">Erase Tile</option>
+        <option value="entity">Place Entity</option>
+        <option value="rule-paint">Rule Paint</option>
+      </select>
+    </label>
+    <label title="Tile ID to paint with (1-255)">Tile ID:
+      <input id="tile-id" type="number" value="1" min="1" max="255" style="width: 50px;">
+    </label>
+    <label title="Map width in tiles">Map W:
+      <input id="map-width" type="number" value="64" min="1" max="1024" style="width: 64px;">
+    </label>
+    <label title="Map height in tiles">Map H:
+      <input id="map-height" type="number" value="36" min="1" max="1024" style="width: 64px;">
+    </label>
+    <label title="Tile size in pixels">Tile:
+      <input id="map-tile-size" type="number" value="16" min="1" max="128" style="width: 56px;">
+    </label>
+    <button id="btn-apply-map" class="btn btn--secondary" title="Apply map dimensions and tile size">Apply Map</button>
+  </div>
+
+  <main>
+    <aside class="left-rail">
+      <nav id="tab-bar" class="tab-bar" aria-label="Workspace tabs">
+        <button class="tab-btn" data-tab="tasks" aria-selected="true">Tasks</button>
+        <button class="tab-btn" data-tab="console" aria-selected="false">Console</button>
+        <button class="tab-btn" data-tab="story" aria-selected="false">Story</button>
+        <button class="tab-btn" data-tab="onboarding" aria-selected="false">Getting Started</button>
+        <button class="tab-btn" data-tab="behavior" aria-selected="false">Behavior</button>
+        <button class="tab-btn" data-tab="sprite" aria-selected="false">Sprite</button>
+        <button class="tab-btn" data-tab="effects" aria-selected="false">Effects</button>
+        <button class="tab-btn" data-tab="export" aria-selected="false">Export</button>
+        <button class="tab-btn" data-tab="animation" aria-selected="false">Animation</button>
+      </nav>
+      <section class="bottom-tabs">
+        <section class="tab tab--active" data-tab="tasks" aria-label="Tasks">
+          <div id="tasks-panel"></div>
+        </section>
+        <section class="tab" data-tab="console" aria-label="Console">
+          <div id="console-panel"></div>
+        </section>
+        <section class="tab" data-tab="story" aria-label="Timeline">
+          <div id="story-panel"></div>
+        </section>
+        <section class="tab" data-tab="onboarding" aria-label="Onboarding checklist">
+          <div id="onboarding-checklist"></div>
+        </section>
+        <section class="tab" data-tab="behavior" aria-label="Behavior">
+          <div id="behavior-panel"></div>
+        </section>
+        <section class="tab" data-tab="sprite" aria-label="Sprite">
+          <div id="sprite-panel"></div>
+        </section>
+        <section class="tab" data-tab="effects" aria-label="Effects">
+          <div id="effects-panel"></div>
+        </section>
+        <section class="tab" data-tab="export" aria-label="Export">
+          <div id="export-panel"></div>
+        </section>
+        <section class="tab" data-tab="animation" aria-label="Animation">
+          <div id="animation-panel"></div>
+        </section>
+      </section>
+    </aside>
+    <div class="canvas-stage">
+      <canvas id="editor-canvas" width="1024" height="576"></canvas>
+      <div id="fx-overlay" data-fx-preset="none"></div>
+    </div>
+    <aside class="inspector-panel" aria-label="Inspector">
+      <div id="inspector-panel"></div>
+    </aside>
+  </main>
+
+  <footer>
+    <span id="status">No project loaded</span>
+  </footer>
+
+  <div id="modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-box">
+      <h2 id="modal-title" class="modal-title"></h2>
+      <p id="modal-message" class="modal-message"></p>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn btn--secondary">Cancel</button>
+        <button id="modal-confirm" class="btn btn--primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="context-menu" class="context-menu" hidden role="menu" aria-label="Canvas actions">
+    <button class="ctx-item" role="menuitem" data-action="ctx-delete">Delete Entity</button>
+    <button class="ctx-item" role="menuitem" data-action="ctx-deselect">Deselect</button>
+    <button class="ctx-item" role="menuitem" data-action="ctx-properties">Properties</button>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "@gcs/contracts": "../../contracts/dist/index.js",
+        "@gcs/runtime-web": "../../runtime-web/dist/index.js"
+      }
+    }
+  </script>
+  <script type="module" src="../dist/main.js"></script>
+</body>
+</html>

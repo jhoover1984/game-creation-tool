@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/entity.prefabOrInstance.v2.json",
+  "title": "Entity Prefab or Instance V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entityId", "name", "transform", "components"],
+  "properties": {
+    "entityId": { "$ref": "common.v2.json#/$defs/Id" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "tags": { "type": "array", "items": { "type": "string", "maxLength": 40 } },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "rotation", "scale"],
+      "properties": {
+        "position": { "$ref": "common.v2.json#/$defs/Vec3" },
+        "rotation": { "$ref": "common.v2.json#/$defs/Vec3" },
+        "scale": { "$ref": "common.v2.json#/$defs/Vec3" }
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "entity.component.v2.json" }
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slotName", "slotType", "parentEntityId", "anchorName", "occlusionHint"],
+        "properties": {
+          "slotName":       { "type": "string", "minLength": 1, "maxLength": 60 },
+          "slotType":       { "type": "string", "enum": ["socket", "prop"] },
+          "parentEntityId": { "$ref": "common.v2.json#/$defs/Id" },
+          "anchorName":     { "type": "string", "minLength": 1, "maxLength": 60 },
+          "occlusionHint":  { "type": "string", "enum": ["in-front", "behind", "auto"] }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "2.0.0",
+  "nodes": [
+    {
+      "nodeId": "node_start",
+      "kind": "start",
+      "name": "Start"
+    },
+    {
+      "nodeId": "node_branch",
+      "kind": "branch",
+      "name": "Guard Check",
+      "conditions": [
+        {
+          "op": "cmp",
+          "key": "rep_guard",
+          "cmp": ">=",
+          "value": 10
+        }
+      ],
+      "effects": [
+        {
+          "kind": "setFlag",
+          "key": "gate_open",
+          "value": true
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "node_start",
+      "to": "node_branch",
+      "label": "Talk to Guard",
+      "conditions": [
+        {
+          "op": "hasTag",
+          "key": "player",
+          "value": "hero"
+        }
+      ]
+    }
+  ]
+}

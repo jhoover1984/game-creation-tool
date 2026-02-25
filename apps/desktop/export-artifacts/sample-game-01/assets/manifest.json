@@ -1,0 +1,57 @@
+{
+  "asset_count": 7,
+  "assets": [
+    {
+      "id": "tile_1",
+      "kind": "tile",
+      "label": "Tile 1",
+      "path": "assets/starter/tile_1.svg",
+      "source": "starter_pack://tiles/1"
+    },
+    {
+      "id": "entity_crate_prop_gb",
+      "kind": "entity_sprite",
+      "label": "Crate Prop (GB)",
+      "path": "assets/starter/entity_crate_prop_gb.svg",
+      "source": "starter_pack://entities/crate_prop_gb"
+    },
+    {
+      "id": "entity_player",
+      "kind": "entity_sprite",
+      "label": "Player",
+      "path": "assets/starter/entity_player.svg",
+      "source": "starter_pack://entities/player"
+    },
+    {
+      "id": "entity_rock_prop_gb",
+      "kind": "entity_sprite",
+      "label": "Rock Prop (GB)",
+      "path": "assets/starter/entity_rock_prop_gb.svg",
+      "source": "starter_pack://entities/rock_prop_gb"
+    },
+    {
+      "id": "audio_pickup",
+      "kind": "audio_clip",
+      "label": "audio_pickup",
+      "path": "assets/audio/audio_pickup.wav",
+      "source": "project_asset://audio/audio_pickup"
+    },
+    {
+      "id": "audio_step",
+      "kind": "audio_clip",
+      "label": "audio_step",
+      "path": "assets/audio/audio_step.wav",
+      "source": "project_asset://audio/audio_step"
+    },
+    {
+      "id": "audio_theme",
+      "kind": "audio_clip",
+      "label": "audio_theme",
+      "path": "assets/audio/audio_theme.wav",
+      "source": "project_asset://audio/audio_theme"
+    }
+  ],
+  "generated_by": "gcs-export-core",
+  "profile": "game_boy",
+  "schema_version": 1
+}

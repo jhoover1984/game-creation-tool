@@ -1,0 +1,1272 @@
+GAME CREATOR STUDIO - DESIGN DOCUMENT (v1.2)
+Single source of truth for architecture, UX rules, data formats, and roadmap.
+Last consolidated: February 19, 2026
+Change from v1.1: Visual Style model replaces hardware-emulation profile lock.
+  Editor canvas is now world-space. Game resolution is user-configurable.
+  UI layout overhauled to match modern 2D editor standards (see Sections 2, 4, 6, 9).
+------------------------------------------------------------
+
+
+A. INVARIANTS (NON-NEGOTIABLES)
+
+These must remain true in every release and every future tier.
+
+1) Preview = Export
+   The same runtime that previews in-editor is what ships in exported builds.
+
+2) Never break old projects
+   Any project ever created must open in newer versions via automatic migrations.
+
+3) Every edit is undoable
+   Ctrl+Z / Ctrl+Y (Windows/Linux) and Cmd+Z / Cmd+Shift+Z (macOS) work everywhere via a single command bus.
+
+4) Saves are atomic and recoverable
+   Write-to-temp -> fsync -> rename, plus autosave + backups + crash recovery.
+
+5) No hot-path IPC
+   Rendering/simulation stays inside the engine runtime (native Rust for desktop, WASM for browser). IPC is for file I/O, dialogs, migrations, export only.
+
+6) Visual styles define defaults, not hardware locks
+   A "Game Boy style" means pixel art aesthetics (8px tiles, limited palette, pixel snap) —
+   not a ROM constrained to 160x144. Game resolution and map size are user-configurable.
+   Style presets surface sensible defaults; limits (if any) are advisory, not walls.
+
+7) Beginner-first workflow
+   A first playable game is achievable in minutes (templates + "Make It Playable").
+
+8) Errors are actionable
+   Every error must include: what happened, why, and a one-click path to locate/fix.
+
+9) Assets are portable
+   All asset references are project-relative and normalized (never absolute OS paths).
+
+10) Inspector hot paths avoid JSON
+   Frontend reads hot runtime/editor data via structured binary snapshots (pull model). Desktop path uses Tauri invoke; browser path uses WASM linear memory views.
+
+11) Logical actions batch commands
+   Large ops (bucket fill, multi-select move) produce one undo entry, not thousands.
+
+
+B. TABLE OF CONTENTS
+
+1. Vision & Goals
+2. Product Scope (v1)
+3. Architecture
+4. Engine Design & Rendering
+5. Project Data Format (Safety)
+6. Editor Screens
+7. Tool Suite (v1)
+8. Ergonomics & Interaction Standards
+9. Visual Design System
+10. Scripting Architecture
+11. Export & Portability
+12. Backwards Compatibility
+13. Menus, Settings & Keybinds
+14. Coding & Quality Standards
+15. Iteration Roadmap
+16. What We Keep from v0.6
+
+
+------------------------------------------------------------
+1) VISION & GOALS
+
+What this tool is
+
+Game Creator Studio is a unified desktop workspace for making 2D games. It lets users build complete,
+exportable games-maps, pixel art, sprites, dialog, quests, audio, and gameplay logic-without code,
+while still offering scripting and plugins for advanced users.
+
+It is not "a map editor with extras." It is a cohesive creation workflow where every major task lives
+in one workspace with consistent controls, consistent undo, and predictable data.
+
+User experience profiles (same engine power, different UI exposure)
+
+Beginner profile:
+- Minimal UI density and reduced panel count
+- Guided defaults, first-run walkthrough, and contextual tips
+- Strong safeguards and one-click recovery actions
+- Advanced settings hidden by default (discoverable, not deleted)
+
+Builder profile:
+- Full core production layout (Map/Story/Draw/Animation/Audio)
+- Fewer coach marks, faster editing affordances, deeper inspector groups
+- Recommended for daily use after first project
+
+Pro profile:
+- Maximum control surface, dense layout, advanced inspector sections
+- Full shortcut/layout customization and automation entry points
+- Minimal interruptions; guardrails remain available but non-intrusive
+
+Audience tiers (who uses the profiles)
+
+Beginner:
+- Never made a game before
+- Starts in Beginner profile
+
+Intermediate:
+- Comfortable learning basic logic and scripting
+- Typically operates in Builder profile
+
+Advanced:
+- Wants custom mechanics
+- Uses Rhai script expressions + custom components in Pro profile
+
+Power user:
+- Wants plugins and engine-level extension
+- Uses Rhai scripting and engine-level APIs in Pro profile
+
+Core success metric (North Star Moment)
+
+Within 10 minutes on a clean install:
+1) Create/open project
+2) Paint a small map
+3) Place player + NPC
+4) Add one dialog choice
+5) Playtest
+6) Export a working HTML5 build
+
+If this is not reliable, v1 is not "done."
+
+
+------------------------------------------------------------
+2) PRODUCT SCOPE (v1)
+
+Starting aesthetic (pixel art, retro-inspired)
+
+v1 targets pixel art games in a retro aesthetic — NOT hardware emulation.
+
+A "Game Boy style" game in GCS means:
+- 8×8 or 8×16 pixel tiles with pixel-snap movement
+- A limited color palette (4–16 shades) for visual consistency
+- Chunky pixelated look via nearest-neighbor scaling
+- The EXPORTED game runs at a modern resolution (default 1280×720) with integer scaling
+  so it looks correct on any screen without letterboxing artifacts
+
+Critically: the editor canvas is NOT locked to 160×144. Users edit in a
+world-space canvas that can hold any map size. A "game screen boundary"
+overlay shows the visible area the player will see at runtime, but this is
+a guide — not the editor's own viewport limit.
+
+This model matches how every successful modern retro game works:
+Undertale, Celeste, Shovel Knight — all run at modern resolutions with
+pixel art rendering. GCS should work the same way.
+
+Visual style presets (what "profile" now means)
+
+Each preset provides defaults a user can override:
+  Pixel Classic (was "Game Boy"):
+    tile_size: 8px, suggested_palette: 4-color, pixel_snap: on
+    source_resolution_default: 160×144, display_scale_default: 6×
+  Pixel Modern (was "NES"):
+    tile_size: 16px, suggested_palette: 54-color, pixel_snap: on
+    source_resolution_default: 320×180, display_scale_default: 4×
+  16-bit (was "SNES"):
+    tile_size: 16px, suggested_palette: full, pixel_snap: on
+    source_resolution_default: 384×216, display_scale_default: 3×
+  Custom:
+    all fields user-configurable, no advisory limits
+
+Resolution model
+  source_resolution: the logical game canvas (what game code works in)
+  display_scale: integer multiplier for final output (≥1)
+  output_resolution: source × scale (what the player's window shows)
+  editor_world: independent — always large enough to hold any map
+
+v1 non-goals (scope guardrails)
+
+v1 non-goals (scope guardrails)
+
+v1 intentionally excludes:
+- Accounts, cloud sync, marketplaces, online publishing
+- Multiplayer/netplay
+- Cinematic timeline editors/cutscene tools
+- Advanced physics / particles / dynamic lighting
+- "Convert arbitrary Rhai back into graph blocks"
+- Full DAW/tracker audio editing (v1 is import + mix)
+- Global/symlinked asset libraries (v1 is project-local assets)
+
+v1-core ship gate (must ship in 1.0)
+
+- Project open/save/migrate/backup/repair flows are stable.
+- Map editor + playtest + export complete the North Star Moment.
+- Command bus undo/redo is enforced in every shipped tool.
+- Issues Drawer, Global Find, and Find References work on production-size projects.
+- Scripting MVP supports IR editing + runtime execution + actionable errors.
+
+v1+ (explicit defer list, not required for 1.0)
+
+- Advanced Draw Studio operations beyond core sprite workflow.
+- Expanded Animation Lab workflows beyond import/timeline/preview.
+- Audio features beyond import + simple mix + preview.
+- Tier 1.5 and Tier 2 items listed in roadmap.
+
+Definition of Done (v1.0)
+
+v1.0 is complete only when:
+- North Star Moment is achievable end-to-end.
+- Autosave, backups, recovery, and atomic saving are rock-solid.
+- Undo/redo works across every tool and settings.
+- Preview and Export behave the same (Preview = Export).
+- Old projects open via automatic migrations with clear reporting and rollback path.
+- Errors are always actionable (locate + fix suggestion).
+- Large projects remain usable (search, references, performance baselines, no UI jank).
+
+
+------------------------------------------------------------
+3) ARCHITECTURE
+
+Stack overview
+
+App shell: Tauri 2.x (desktop), static site (browser)
+Backend: Rust (native via Tauri for desktop, compiled to WASM for browser)
+Engine: Rust crates (engine-core, script-core, export-core) — same code, two targets
+Frontend: JavaScript (ES2022 modules) with TypeScript type-checking via JSDoc (no bundler)
+Rendering: Canvas 2D for pixel art profiles; WebGL upgrade path reserved for large-world / high-entity profiles
+Scripting: Rhai (Rust-native embedded scripting, sandboxed, WASM-compatible)
+Icons: Lucide (migrating to single icon family per Visual Design System)
+Fonts: Inter (UI), JetBrains Mono (code/log)
+
+Distribution model:
+- Desktop (primary): Tauri installer — native Rust backend, filesystem access, offline-first
+- Browser (secondary): same Rust crates compiled to WASM, same JS frontend, no install required
+- Exported games are identical regardless of which version created them
+- Project files (.gcs) are compatible across both versions
+
+State ownership (single authoritative truth)
+
+Frontend (JavaScript) owns:
+- UI routing, selection, tool state, panels/layout
+- Indexed search lists and local filtering
+- Immediate UX feedback (optimistic UI)
+
+Rust backend owns:
+- Disk I/O (load/save) — via Tauri on desktop, via browser File System Access API or IndexedDB on web
+- Atomic writes + autosave + backups
+- Migrations + validation + repair flows
+- Export bundling
+- ECS world state, simulation, collision, audio playback during playtest
+
+Key rule:
+- Only Rust writes to disk (or persistent storage on browser).
+- All mutations flow through the command bus.
+- No duplicated "truth" across layers.
+- Same Rust crates serve both desktop (native) and browser (WASM) targets.
+
+Binary inspector bridge (hot paths — future optimization)
+
+To keep the editor snappy at scale:
+- Inspector and entity lists should minimize JSON serialization overhead on hot paths.
+- Desktop path: Tauri invoke returns structured JSON snapshots (current v1 approach, performant at target scale).
+- Browser path (future): frontend reads structured binary snapshots from WASM linear memory (pull model).
+- JSON remains the primary transport for v1. Binary bridge is a staged optimization for high-entity-count projects.
+
+Binary bridge ABI contract (staged — not yet implemented)
+
+- Every snapshot buffer starts with: abi_version (u16), payload_type (u16), payload_size (u32).
+- Frontend validates headers before reading payload bytes; mismatch triggers safe JSON fallback.
+- On ABI mismatch, editor falls back to JSON diagnostics path (degraded but functional).
+- ABI versions are additive within minor releases; breaking layout changes require migration notes.
+- CI includes ABI conformance tests for Rust producer and frontend consumer.
+
+
+Binary Inspector Bridge implementation plan (staged — browser target optimization).
+
+Note: v1 desktop uses Tauri JSON invoke for all inspector/entity data. This binary bridge
+plan applies to the browser (WASM) target where eliminating JSON overhead matters at scale.
+
+Goals.
+- Keep inspector interactions under the v1 target (<= 50 ms visible commit path).
+- Minimize JSON serialization overhead in hot inspector/entity-list paths.
+- Maintain safe degraded behavior when ABI contracts drift.
+
+Payload model (producer -> consumer).
+- Snapshot buffer layout:
+  - Header: abi_version (u16), payload_type (u16), payload_size (u32), frame_id (u32), crc32 (u32)
+  - Body: payload-specific packed structs in little-endian order
+- payload_type values (initial):
+  - 1 = InspectorSelectionSnapshot
+  - 2 = EntityListSnapshot
+  - 3 = TransformDebugSnapshot
+- Strings are dictionary encoded:
+  - String table section: count + offsets + utf8 bytes
+  - Body references string IDs (u32), not raw variable-length strings
+
+Rust/WASM responsibilities.
+- Build snapshots from authoritative ECS state after simulation tick or editor mutation commit.
+- Write snapshots into a double-buffered linear-memory region:
+  - Front buffer: stable for frontend reads
+  - Back buffer: writable for next snapshot build
+  - Swap only after full snapshot + crc32 is complete
+- Export FFI calls (WASM exports):
+  - get_snapshot_ptr(payload_type) -> u32
+  - get_snapshot_len(payload_type) -> u32
+  - get_snapshot_frame_id(payload_type) -> u32
+  - get_snapshot_abi_version(payload_type) -> u16
+- Reuse arenas for snapshot assembly to avoid per-frame allocations.
+
+Frontend (JavaScript) responsibilities.
+- Poll only visible panels (no hidden-panel polling).
+- For each needed payload:
+  - Read ptr/len/frame_id/abi_version
+  - Skip decode if frame_id unchanged
+  - Validate header, payload_size bounds, and crc32 before decode
+- Decode using DataView + typed arrays with zero-copy slices when possible.
+- On mismatch/failure:
+  - Emit structured telemetry event
+  - Fallback to JSON diagnostics path for that panel
+  - Keep editor responsive (no hard-fail on decode errors)
+
+Update scheduling.
+- Poll cadence defaults:
+  - InspectorSelectionSnapshot: on selection change + 30 Hz while visible
+  - EntityListSnapshot: 10 Hz while visible, immediate refresh after entity mutations
+  - TransformDebugSnapshot: on-demand when debug overlays enabled
+- Backpressure rule:
+  - If decode time exceeds budget for 3 consecutive frames, reduce poll frequency automatically.
+
+Versioning and compatibility.
+- abi_version change policy:
+  - Minor additions: append-only fields at end of payload structs
+  - Breaking reorder/removal: increment major ABI version and gate with fallback
+- Frontend decoder registry keyed by (payload_type, abi_version).
+- CI matrix must validate:
+  - Current Rust producer with current frontend decoder
+  - Current Rust producer with previous frontend decoder (expected fallback behavior)
+
+Validation and observability.
+- Required metrics:
+  - decode_time_ms by payload type (p50/p95/p99)
+  - snapshot_bytes by payload type
+  - fallback_count and fallback_reason
+  - frame_id staleness (age since last update)
+- Add a hidden debug panel:
+  - Live ABI/payload stats
+  - Last decode error
+  - Toggle to force JSON fallback for A/B comparison
+
+Testing strategy.
+- Unit (Rust):
+  - Header packing, crc32 correctness, struct alignment guarantees
+  - Deterministic snapshot content for seeded fixture worlds
+- Unit (Frontend):
+  - Decoder correctness on golden binary fixtures
+  - Corrupt/short buffer handling without throw-to-crash behavior
+- Integration:
+  - End-to-end selection edit roundtrip validates <= 50 ms visible update target
+  - ABI mismatch simulation confirms automatic JSON fallback and non-blocking UX
+
+Rollout plan.
+- Phase 1: Ship bridge for InspectorSelectionSnapshot behind feature flag.
+- Phase 2: Extend to EntityListSnapshot after metrics are stable.
+- Phase 3: Remove legacy JSON hot path for migrated payloads (keep diagnostics fallback only).
+- Exit criteria:
+  - p95 decode_time_ms <= 4 ms for inspector payload on reference hardware
+  - fallback_count < 0.1% of decode attempts in internal dogfood sessions
+  - No user-visible inspector freezes attributed to bridge decode failures
+
+Optimistic UI (snappiness standard)
+
+For inspector edits:
+- UI updates instantly.
+- Command bus applies the change.
+- If validation fails or a rare backend error occurs, UI rolls back with a subtle, actionable notice.
+
+IPC contract (minimal and typed)
+
+Web -> Rust (invoke):
+- open_project(path): load + validate + migrate + return manifest + health
+- save_project(path, manifest, data_files): atomic save + rotate backups
+- export_html5(path, options): bundle runtime + data + assets
+- dialogs: open/save file dialogs
+- list_recent_projects()
+
+Rust -> Web (events):
+- project_loaded({manifest, warnings})
+- project_saved({path, backup_created})
+- export_complete({path})
+- project_health({warnings, near_limits, missing_assets, trashed_refs})
+- migration_report({from, to, changes, warnings})
+
+Diagnostics and fix-assist architecture (browser-safe)
+
+Primary diagnostics path (required):
+- Deterministic local checks run offline and on every edit/save/export gate.
+- Sources: schema validation, reference integrity, profile limits, script/runtime errors, export blockers.
+- Results must be stable, explainable, and actionable without internet access.
+
+Built-in fix knowledge (required):
+- Error taxonomy maps each known error type to structured fix actions.
+- Issues Drawer must expose one-click fixes where safe (relink, placeholder, open-location).
+
+Optional cloud fix advisor (opt-in):
+- Unknown/complex errors may be sent as sanitized diagnostic envelopes to a backend advisor service.
+- Service uses curated sources and returns ranked fixes with confidence + citations.
+- No direct client-side web scraping from editor runtime for safety/privacy/reliability reasons.
+- Cloud advisor must never block local editing; it is assistive fallback only.
+
+
+------------------------------------------------------------
+4) ENGINE DESIGN & RENDERING
+
+ECS
+
+Custom lightweight ECS in engine-core (hecs considered but not adopted for v1):
+- Entities are IDs
+- Components are data structs (EntityComponents, ComponentStore)
+- Systems operate over matching entities via typed accessors
+- Collision, movement, physics, and input systems use component queries
+
+Game loop
+
+- Fixed timestep simulation (60 ticks/sec)
+- Render as fast as possible (interpolated)
+
+Transforms & hierarchy
+
+- Local transform + parent/child relationships
+- WorldTransform(entity) = WorldTransform(parent) * LocalTransform(entity)
+- Re-parenting preserves world position by default (undoable command)
+
+Transform caching (dirty flags)
+
+- Cached world transforms
+- DirtyTransform flags set on local changes or parent changes
+- Recalc system traverses roots downward, clears flags after recompute
+- v1 uses simple 2D vectors; full matrices reserved for future tiers
+
+Spatial indexing (scale readiness)
+
+Users build large maps regardless of visual style:
+- Tilemaps are chunked (16×16 or 32×32 tiles) for render/edit
+- Entity selection/picking uses a uniform grid per chunk
+- Hover, pick, and common interactions must remain near-constant time
+
+Visual Styles (replacing "Profiles" for export/rendering)
+
+Visual styles provide DEFAULTS, not hard constraints. Users can override any value.
+The UI surfaces recommendations and advisory warnings; it does not block editing.
+
+Built-in styles:
+  Pixel Classic:  tile_size=8,  source_res=160×144, scale=6×, palette=4-color
+  Pixel Modern:   tile_size=16, source_res=320×180,  scale=4×, palette=54-color
+  16-bit:         tile_size=16, source_res=384×216,  scale=3×, palette=full
+  Custom:         all fields configurable, no advisory limits
+
+Rendering model
+
+The editor canvas and the game runtime use the same tile/entity data but
+render differently:
+
+Editor canvas (world-space):
+- Large scrollable canvas; pan and zoom freely (25%–800%)
+- No resolution boundary in the editor itself
+- "Game screen boundary" shown as a highlighted overlay (dashed border)
+  indicating the area the player sees at the current source_resolution
+- Tile grid drawn at tile_size × zoom_scale
+- Entities drawn at game scale (not inflated debug boxes)
+
+Game runtime (source_resolution):
+- Renders tiles/sprites at source_resolution using Canvas 2D
+- imageSmoothingEnabled = false for pixel-perfect nearest-neighbor scaling
+- Output canvas CSS-scaled to output_resolution (source × scale)
+
+Render passes (runtime):
+  Pass 1 (Scene):   tiles + sprites at source_resolution, nearest-neighbor
+  Pass 2 (Post):    CRT/palette effects — deferred to v1+
+  Pass 3 (Overlay): debug grid, collision, IDs, selection (editor-only)
+
+Future rendering evolution:
+- Canvas 2D sufficient for pixel art styles (≤384×216 source, <200 sprites)
+- WebGL upgrade reserved for high-entity or large-world configurations
+- Renderer behind clean interface (ui-canvas-renderer.js) to enable swap
+
+
+------------------------------------------------------------
+5) PROJECT DATA FORMAT (SAFETY)
+
+Directory-based project structure
+
+my_game/
+  project.json
+  data/
+    maps/*.json
+    entities/*.json
+    dialogs/*.json
+    scripts/*.json
+    items_flags/*.json
+  assets/
+    sprites/
+    tilesets/
+    audio/
+  backups/
+  exports/
+  trash/
+
+Data rules
+
+- Stable UUIDs for all IDs (never reused)
+- Project-relative paths only, normalized on load/save
+- Atomic saves: temp -> fsync -> rename
+- Autosave (default 60s) and rolling backups
+- Reference validation + repair on load
+
+Canonical JSON (human diffs)
+
+- Stable key ordering and indentation
+- Stable array ordering where meaningful; otherwise normalized
+
+Team workflow and source control policy
+
+- Project data files are text-first JSON for diff/merge visibility.
+- Asset metadata is stable and deterministic to avoid noisy diffs.
+- Binary assets (large audio/images) are lock-recommended in team workflows.
+- In-editor source control operations are required for assets (check out, add, revert, submit).
+- Pre-submit changelist validation checks for dangling references and missing dependencies.
+- File watcher detects external VCS changes and triggers reload/reindex prompts; in-editor VCS operations are preferred.
+- No absolute machine-specific paths are permitted in committed project data.
+- Pre-commit validation checks schema version, path normalization, and reference integrity.
+
+Relink Wizard (missing assets)
+
+When broken paths are detected:
+- One-click wizard to remap asset root
+- Preview changes + rollback
+- Supports partial remaps
+
+Non-destructive deletion (Trash)
+
+Deleting a referenced asset:
+- Moves file to trash/
+- Marks as "trashed" in index
+- References remain, and Issues Drawer prompts resolution:
+  - Replace everywhere
+  - Replace with placeholder (non-blocking continue-work option)
+  - Restore
+  - View references
+  - Permanently delete (blocked while referenced unless explicit override)
+
+
+------------------------------------------------------------
+6) EDITOR SCREENS
+
+Welcome / Dashboard
+
+- Recent projects grid
+- New/Open/Import
+- "Make It Playable"
+- Guided first-run tour (dismissable; replayable)
+- Version history "Revert to..."
+- Project Health summary
+- Issues Drawer button with badge count
+
+Play Test
+
+- Full-screen game view
+- Controls: pause/restart/exit/return to editor
+- Return to last editor tab
+- Debug overlays: grid, collision, entity IDs, script trace, profile limits
+- Slow-mo (1x/0.5x/0.25x) + frame step
+- Dockable Log Console: logs + errors + jump-to-source + one-click fixes
+- Inline error panel for runtime issues
+- Mini-map option
+- Playtest Debugger (v1 scope, focused):
+  - Breakpoints on key runtime events (interact, trigger enter, item pickup, quest state change)
+  - Step controls: continue, pause, step-over event, frame-step
+  - Watch panel for important runtime state (flags, variables, inventory, quest states)
+  - State diff view ("what changed since last step/frame")
+  - Trace stream with filters (entity/system/severity)
+  - Click-to-inspect entity runtime state from viewport
+- Assertions and watchpoints (Tier 1.5):
+  - Author "expected state" checks in playtest
+  - Failed checks produce actionable issues with jump-to source
+
+Note: "rewind/step-back" is explicitly Tier 2 (not a v1 dependency).
+
+
+------------------------------------------------------------
+7) TOOL SUITE (v1)
+
+Global tool expectations
+
+- One command bus for all mutations (undo everywhere)
+- Large operations are batched into a single undo entry
+- First-use hints: one-line tooltip + hotkey, dismissable; tips toggle in Settings
+- Search-in-view for lists > 30 items (filter-as-you-type)
+- Find References available via right-click context menus
+- Global Find in Project exists (Ctrl+Shift+F) for cross-project discovery (see Ergonomics section)
+- Reselect previous selection:
+  - Default hotkey: Ctrl+Alt+Z (Windows/Linux), Cmd+Option+Z (macOS) (configurable)
+  - Restores last selection set within the current editor context
+- Consistent feedback patterns: toasts (transient), inline validation, Issues Drawer (persistent)
+- Universal canvas controls apply (see Ergonomics section)
+
+Dashboard (home base)
+
+- Project grid + thumbnails
+- Make It Playable
+- Guided tour trigger
+- Version history/recovery entry points
+- Health + Issues overview
+
+Map Editor
+
+Layout (standard 3-panel):
+  App bar (top, fixed ~40px):
+    Left:   Logo + project name
+    Center: Mode indicator (Edit / Playtest)
+    Right:  Save | Playtest button
+  Tool bar (below app bar, ~36px):
+    Left:   Select | Paint Tile | Erase Tile | Fill | Add Entity
+    Right:  Zoom controls (fit / 1× / 2× / 3×) | Grid toggle
+  Left panel (collapsible, ~220px):
+    Scenes list + Add Scene
+    Entity list (names + positions, scrollable)
+    [NOT onboarding checklists — those live in a separate Help panel]
+  Center canvas (fills remaining space):
+    World-space tile canvas, pan (middle-mouse/space+drag) + zoom (wheel)
+    Game screen boundary overlay (dashed rect showing source_resolution area)
+    Tile grid overlay (toggleable)
+    Entity nodes sized to tile_size × zoom_scale (not giant debug boxes)
+    Marquee select, ghost-on-paint, move-shadow
+  Right panel (collapsible, ~280px):
+    Inspector: entity Name, X, Y, Components
+    Map Entities list (select to jump)
+    Export panel
+  Bottom (collapsible, ~160px):
+    Log console + breakpoint trace tabs
+  Onboarding / Quick Start / Walkthrough:
+    Triggered via a Help button or first-run flow — NOT a permanent left-panel section
+
+Canvas behavior:
+- Pan: middle-mouse drag or space+drag
+- Zoom: scroll wheel, centered on cursor; buttons for snap levels
+- Game screen boundary: always visible when editing, hidden during playtest
+- Tile painting tools: pencil/bucket/eraser/eyedropper/select/stamp
+- Ghost preview under cursor (50% opacity)
+- Entity palette: player/basic NPC
+- Templates panel: signpost/chest/door/patrol NPC/simple enemy (with defaults)
+- Scene tree hierarchy, reorder, rename, group
+- Inline mini-playtest viewport
+- Live animation preview for selected entity in inspector
+- Smart-drop:
+  - Dragging an asset/template onto map attaches default components/script if defined
+  - If multiple variants exist, show non-blocking choice chips
+- Shadow-on-move:
+  - Original position remains as faint shadow until commit/cancel
+- Patrol/route overlay (Tier 1.5):
+  - If a route is authored, show a faint ghost path when selected
+
+Draw Studio (pixel art)
+
+- Canvas zoom/grid/onion skin
+- Tools: pencil/eraser/fill/line/rect/eyedropper
+- Palette editor (profile constrained)
+- Reference image layer: import PNG, lock, opacity slider
+- Frame timeline + preview
+- Quick ops: color replace, nudge 1-2px, flip/mirror
+- Starter asset packs (v1 requirement):
+  - Ship profile-safe starter packs for Game Boy, NES, and SNES (player/NPC/chest/tree/rock/tiles/UI frame/font)
+  - Assets must be recognizable and production-usable, not placeholder noise blocks
+  - Packs are versioned and replaceable without breaking existing projects
+- Draw Studio Seed quality bar:
+  - Primitive seeds (tree/bush/rock/crate/chest) use deterministic silhouette + shading templates
+  - Outputs are readable at 1x and clean when upscaled (2x/3x/4x)
+  - Seed outputs remain fully editable in Draw Studio
+- Media ingest (lightweight-first):
+  - v1: GIF import + frame extraction with fps/trim controls
+  - v1+: MP4/WebM import via ffmpeg-wasm/native helper (feature-flagged)
+  - All imports end as deterministic sprite sheets + metadata in project format
+
+Animation Lab
+
+- Sprite sheet importer + frame extractor
+- Timeline with playback loop
+- Direction mirroring helper
+- Preview on selected entity
+- Video/GIF-to-animation pipeline (v1+):
+  - Optional auto-slice suggestions and duplicate-frame removal
+  - Profile-aware palette remap (e.g., Game Boy 4-shade conversion)
+  - Processing must be cancellable and non-blocking
+
+Story Maker
+
+- Screenplay-style dialog editor
+- Preview-from-here (run subtree instantly)
+- Visual scripting blocks for built-in commands
+- Dialog review list (searchable), missing variable checks
+- Flags/items/variables browser (search + find references)
+
+Audio
+
+- Import WAV/OGG
+- Simple mixer: volume/loop/category
+- Playback preview
+- Tags + search
+- Lightweight AI-assist policy (v1+):
+  - AI cleanup/generation features are opt-in and never required
+  - Any AI output must pass normal profile/validation rules before save/export
+
+Cross-tab features
+
+Issues Drawer (persistent problems + navigation)
+- Missing assets
+- Trashed-but-referenced assets
+- Near limits
+- Migration warnings
+- Script watchdog events
+- Export blockers
+- Reference search results (Find References output)
+Each item includes: what/why, jump to, auto-fix if available, resolve/ignore rules (ignore tracked visibly).
+For missing/trashed assets, one-click "Replace with Placeholder" must be available when a safe placeholder exists.
+
+Universal command palette (Ctrl+K)
+- Fuzzy search and command execution
+- Contextual ranking by active tab/tool
+
+Inspector enhancements
+- Collapsible property groups
+- Numeric sliders + text input + mouse-wheel fine control
+- Palette-aware color inputs
+- Optimistic edits with rollback on validation failure
+
+
+------------------------------------------------------------
+8) ERGONOMICS & INTERACTION STANDARDS
+
+Purpose
+These rules define the "muscle memory layer." They must feel identical across Map/Draw/Animation.
+
+Universal canvas controls (Map / Draw / Animation)
+
+- Middle mouse drag pans
+- Mouse wheel zooms centered on cursor
+- Spacebar temporarily switches to Pan (hold -> pan; release -> restore tool)
+- Esc cancels current operation and returns to Select tool
+- Precision nudging:
+  - Arrow keys: 1px
+  - Shift + arrows: 8px (or current grid size when grid snapping is active)
+
+Creation flow
+
+- Focus-on-create:
+  - Creating an entity focuses Name in inspector immediately
+  - Enter commits; Esc cancels rename
+
+Selection resilience
+
+- Reselect previous selection command exists:
+  - Default hotkey: Ctrl+Alt+Z (Windows/Linux), Cmd+Option+Z (macOS) (configurable)
+  - Restores the last selection set within the current editor context
+
+Discovery at scale
+
+Local search (search-in-view)
+- Any list > 30 items includes a local search bar that filters as-you-type
+
+Global Find in Project (Ctrl+Shift+F)
+- Opens a searchable modal that scans project indexes for:
+  - entity names
+  - dialog text
+  - flag/item/variable names
+  - script node labels
+  - asset filenames
+- Results grouped by type: Maps / Entities / Dialog / Flags / Assets / Scripts
+- Clicking a result jumps to location (opens tab + selects)
+- Can filter results by "Issues only" (ties into the Issues Drawer)
+- Ctrl+K can surface recent Find results for quick re-open
+
+Find References everywhere
+- Context menu entry on assets/flags/variables/entities
+- Opens Issues Drawer filtered to reference results with jump-to actions
+
+Confidence overlays
+
+- Shadow-on-move (original position ghost)
+- Ghost preview for placement
+- Focus bloom for selection visibility
+
+
+------------------------------------------------------------
+9) VISUAL DESIGN SYSTEM
+
+Theme modes (active visual system)
+
+Note: The original Forge/Gemstone theme concept is archived. The active visual system
+uses a blue-neutral token palette defined in docs/frontend/Visual Design System.md.
+
+Active themes:
+- dark (default): neutral dark panels with blue accent (#58a6ff)
+- light: light background variant
+- dark_high_contrast: high-contrast dark variant for accessibility
+
+Archived concept (Forge/Gemstone):
+- Forge (charcoal + gold) and Gemstone accents (Amber, Ruby, etc.) were the original
+  design direction. They may be revisited as an optional Phase D personality pass.
+- If revived, they would be implemented as theme presets using the token system, not
+  as a separate visual language.
+
+Core semantic tokens (active)
+- --bg-0, --bg-1, --panel, --panel-elevated
+- --text-1, --text-2
+- --border, --accent, --accent-weak
+- --success, --warning, --error, --focus
+- Profile flavor accents (decorative only): --profile-accent
+
+See docs/frontend/Visual Design System.md for full token definitions and component rules.
+
+UI Density (Comfort / Dense)
+
+- Comfort (default): generous padding/spacing
+- Dense: reduced padding, smaller fonts, more canvas space
+- Toggle via Settings or Ctrl+K palette
+- Density never changes core layout logic; only spacing and font scales
+
+Accessibility
+- WCAG AA target where applicable (goal 4.5:1 for normal text)
+- Focus-visible always on
+- Reduced motion respected and toggleable
+
+Focus bloom
+- Selected items get a soft accent glow
+- Optional gentle pulse only when motion allowed (otherwise static)
+
+Layouts & panel management
+
+Reference layout (what every serious 2D editor looks like):
+  ┌─────────────────────────────────────────────────────────┐
+  │ App Bar: [Logo  Project Name]    [Mode]    [Save][Play] │
+  ├─────────────────────────────────────────────────────────┤
+  │ Tool Bar: [Select][Paint][Erase][Fill][AddEntity] [Zoom][Grid] │
+  ├──────────┬──────────────────────────────────┬───────────┤
+  │ Left     │                                  │ Right     │
+  │ Panel    │   Canvas (world-space)           │ Panel     │
+  │ 220px    │   fills remaining space          │ 280px     │
+  │          │                                  │           │
+  │ Scenes   │   [game screen boundary          │ Inspector │
+  │ Entities │    dashed overlay]               │ Components│
+  │          │                                  │           │
+  ├──────────┴──────────────────────────────────┴───────────┤
+  │ Bottom: Log Console (collapsible, ~160px)               │
+  └─────────────────────────────────────────────────────────┘
+
+Key constraints:
+- Canvas area ≥ 70% of total window width
+- Left panel contains ONLY navigation (scenes + entity list)
+- Onboarding, Quick Start, and Project Health live in Help panel (? button),
+  NOT as permanent left-panel sections that consume vertical space
+- Entity nodes in canvas: small, proportional to tile_size × zoom, not 64px debug boxes
+- Right panel: inspector + export only; never contains tool controls
+
+- Panels resizable/collapsible/dockable
+- Layout persistence:
+  - Global layout saved by default
+  - Optional "Store layout with project" toggle (off by default)
+- Presets (v1 ships 3): Beginner / Focused Map / Story Mode
+- Presets switchable via menu/palette and reserved safe hotkeys (Ctrl+Shift+1/2/3)
+
+Feedback patterns
+
+- Toasts (bottom-right):
+  - Success: 2-3s
+  - Warning: 4-6s
+  - Error: sticky until dismissed or actioned; includes action when possible
+- Inline notices for validation and caps
+- Issues Drawer for persistent problems (preferred over repeated toasts)
+- Progress UX:
+  - Modal overlay only for blocking tasks (export/migration)
+  - Large edits: chunk + status + cancel
+
+
+------------------------------------------------------------
+10) SCRIPTING ARCHITECTURE
+
+IR is source of truth
+
+- Scripts stored as IR/AST (event graph nodes + edges)
+- Visual editor edits IR directly
+- Rhai code view generated from IR for advanced users (read-only by default, editable as escape hatch)
+
+Event Graph baseline (no-code first)
+
+- Node families are explicit and searchable:
+  - Event nodes (trigger entry points)
+  - Condition nodes (boolean/data checks)
+  - Action nodes (world mutations/effects)
+  - Flow nodes (sequence/branch/delay/repeat/stop)
+- Ports are typed; invalid links are blocked by validator before runtime.
+- Graph execution order is deterministic for the same input sequence.
+
+Nuance model (for real game complexity)
+
+- Subgraphs/functions for reusable patterns (example: chest-open flow, NPC interaction flow).
+- Optional state-machine mode for AI/quest phases.
+- Scoped variables: global/map/entity/quest.
+- Script-node escape hatch for advanced custom logic where graph blocks are insufficient.
+
+Rhai script overrides (advanced)
+
+- Users can attach Rhai expressions/functions to graph nodes as an escape hatch
+- Visual editing disabled for script-override nodes
+- No promise of converting raw Rhai back into graph blocks
+- See ADR-005 for full scripting engine decision and guardrails
+
+Execution & safety
+
+- Events: interact/enter map/tick/custom
+- Rhai sandbox in Rust runtime (native on desktop, WASM on browser)
+- Watchdog: instruction/time budget per tick
+- Soft interrupt: "Abort / Wait / Debug"
+- Debug jumps to offending node/line and highlights last executed step
+- Playtest debug hooks:
+  - Event trace entries include source node ID, entity ID, and state delta summary
+  - Breakpoint hits must pause runtime without desyncing editor state
+  - Watch panel reads deterministic runtime snapshots (same source as inspector/bridge)
+
+Default scripts (smart-drop support)
+
+- Assets/templates may declare default components + default script
+- Smart-drop attaches defaults; remains fully undoable
+- Defaults remain visible/editable in IR
+- Templates are parameterized and versioned to prevent "giant graph" copy-paste drift.
+
+
+------------------------------------------------------------
+11) EXPORT & PORTABILITY
+
+Export formats
+
+- Primary: single optimized HTML5 file
+- Optional: ZIP bundle (separate assets for hosting/debug)
+
+Export parity
+
+- Export uses same runtime as preview (Invariant #1)
+- CI runs headless parity tests that boot both Preview runtime and exported HTML5 runtime.
+- Parity tests capture framebuffer snapshots at deterministic timestamps and compare with configured tolerance.
+- Tolerance policy is explicit: exact match where deterministic, thresholded match where platform render variance exists.
+
+Export presets
+
+- Debug: overlays/logging enabled
+- Release: optimized output
+
+Pre-export checks
+
+- Hard errors block export (missing required assets, invalid profile constraints)
+- Warnings allowed but reported (near limits, trashed referenced assets)
+
+
+------------------------------------------------------------
+12) BACKWARDS COMPATIBILITY
+
+Migrations
+
+- Automatic, pure, idempotent migrations
+- Pre-migration snapshot retained until successful save
+
+Schema and migration contract
+
+- project.json includes project_schema_version (integer, required).
+- Migrations execute strictly in ascending version order, one step per version.
+- Each migration must be deterministic, side-effect free beyond transformed data, and idempotent.
+- Migration report records: from_version, to_version, changed_files, warnings, rollback_snapshot_path.
+- Migration dry-run mode is required for CI and preflight checks.
+- Failed migration must never overwrite the last known-good on-disk state.
+
+Golden projects in CI
+
+Each build runs:
+- Open old project -> migrate -> run deterministic sanity checks headlessly
+- Where feasible: parity checks between preview/export for known scenes
+- Headless parity suite reports per-scene drift metrics and blocks release builds when drift exceeds thresholds.
+
+
+------------------------------------------------------------
+13) MENUS, SETTINGS & KEYBINDS
+
+Menus
+
+- Minimal top menu + omnipresent Ctrl+K palette
+- Standard: New/Open/Save/Save As/Export/Undo/Redo
+
+Settings
+
+Profile:
+- Profile switcher + upgrade warning panel
+
+Appearance:
+- Theme: dark / light / dark_high_contrast
+- Profile accent: per-profile decorative color (non-interactive)
+- UI density: Comfort/Dense
+- Reduced motion: follow OS + toggle
+
+Interaction:
+- Pan/zoom enable + zoom sensitivity
+- Grid nudge size default
+- First-use hints: On/Off
+
+Performance (machine-local defaults):
+- Auto mode by default (recommended)
+- Render scale: 100% / 75% / 50%
+- Target FPS: 60 / 30
+- Overlay quality: full / reduced
+- "Low-end mode" preset
+- Settings are stored per-machine by default (not project data) to keep projects portable
+
+Help & Documentation:
+- Built-in Help panel with searchable guidance
+- Context help ("What can I do here?") per tool
+- Quick Start checklist for North Star flow
+- Issues Drawer links to relevant help entries
+- Help content is local-first; optional online docs are secondary
+
+Layout:
+- Preset selector
+- "Store layout with project" toggle
+
+Keybinds:
+- Searchable shortcuts overlay
+- Click shortcut -> rebind -> conflict resolution
+- Platform defaults preserve common muscle memory:
+  - Redo: Ctrl+Y (Windows/Linux), Cmd+Shift+Z (macOS)
+  - Reselect previous selection: Ctrl+Alt+Z (Windows/Linux), Cmd+Option+Z (macOS)
+
+
+------------------------------------------------------------
+14) CODING & QUALITY STANDARDS
+
+Command bus enforcement
+
+- No project mutation outside commands
+- Tools emitting many mutations must use BatchCommand
+- Commands are deterministic and undoable
+- Undo history supports context-scoped stacks (active editor context) plus global history for project-wide settings
+- Heavy edit tools (bucket fill, multi-select transforms, mass property edits) must store compact before/after deltas, not per-element command spam
+
+Typed shared models
+
+- Rust <-> frontend type contracts maintained via JSDoc typedefs in types.js (verified by tsc --noEmit)
+- IPC payloads are versioned and stable
+- Type generation (ts-rs or equivalent) is a future optimization; current approach is manual JSDoc alignment
+
+Actionable error taxonomy
+
+- Explicit error types:
+  ProjectError / ExportError / ScriptError / EngineError / MigrationError
+- Each must provide:
+  - locate(): where in the editor to jump
+  - suggestFix(): one-click or guided fix when possible
+
+Actionable error templates (required shape)
+
+- Template fields:
+  - title: short human-readable problem summary
+  - what_happened: concrete failure statement
+  - why_it_happened: root cause in plain language
+  - severity: info/warn/error/blocker
+  - location: tab/panel/entity/asset path for jump-to
+  - suggested_fix: primary one-click or guided action
+  - fallback_fix: safe manual recovery path
+  - docs_link: optional short reference for advanced users
+- Example: MissingAssetError
+  - title: "Missing sprite asset"
+  - what_happened: "Entity NPC_12 references assets/sprites/npc_guard.png, but file is missing."
+  - why_it_happened: "Asset was moved, deleted, or not synced from source control."
+  - severity: error
+  - location: "Map Editor -> Entity NPC_12 -> Sprite component"
+  - suggested_fix: "Open Relink Wizard"
+  - fallback_fix: "Replace with placeholder sprite"
+- Example: ProfileLimitError
+  - title: "Sprite limit exceeded"
+  - what_happened: "Scene uses 47 sprites; active profile limit is 40."
+  - why_it_happened: "Added entities exceed profile constraints."
+  - severity: blocker (export), warn (editor while authoring)
+  - location: "Issues Drawer -> Profile Limits"
+  - suggested_fix: "Auto-hide excess decorative sprites by priority"
+  - fallback_fix: "Switch profile or reduce active sprite count"
+
+Performance budgets
+
+- Inspector updates remain fast at scale (binary snapshots)
+- Entity picking remains near-constant time (spatial grid)
+- Large edits chunked and cancellable
+- Baseline frame-time targets documented and tested
+- Initial measurable targets (v1):
+  - Inspector value commit visible in <= 50 ms on reference hardware
+  - 99th percentile entity pick in <= 2 ms at 10k entities in loaded world
+  - Playtest steady frame budget supports 60 FPS at Game Boy profile
+  - Global Find first results in <= 300 ms on medium projects
+- Lightweight implementation rules:
+  - Browser-first path avoids heavy always-on background workers
+  - Expensive media ingest (video decode, AI cleanup) is explicit user-invoked, cancellable, and can run in worker/native helper paths
+  - Feature flags gate advanced pipelines so v1 remains lean
+
+Testing
+
+- Unit: schema validation, migrations, command inverses where applicable
+- Integration: open/save/export on sample projects
+- Golden projects suite runs in CI on every build
+
+
+------------------------------------------------------------
+15) ITERATION ROADMAP
+
+Milestones (avoid rewrites)
+
+1) Project system: load/save/migrate/backup + canonical JSON + project health + relink + trash
+2) Renderer: tilemap chunking + spatial grid + mandatory FBO pipeline + overlays
+3) Map editor MVP: paint/select/collision + ghost preview + batching + shadow-on-move
+4) Command bus: full undo/redo enforcement + batching + selection rules
+5) Entities + inspector: templates + smart-drop + binary snapshots + optimistic UI
+6) Story maker: preview-from-here + dialog review + find references + global find
+7) Playtest: slow-mo/frame-step + logs + script trace + actionable errors
+8) Export: HTML5 + ZIP + debug/release presets + export checks
+9) Polish: performance, UX, accessibility audit, docs
+
+Tiering notes
+- Tier 1.5: patrol route overlay (authored routes only)
+- Tier 2: playtest rewind/step-back (requires deterministic capture/snapshots)
+
+
+------------------------------------------------------------
+16) WHAT WE KEEP FROM v0.6
+
+- Starter Town template
+- Core entity/dialog flow
+- Playtest loop
+
+Reuse rule:
+- Old code may be reused only if it satisfies current invariants, tests, and style standards.
+
+
+------------------------------------------------------------
+17) LEARNING FLOWS AND ASSISTED CONTENT (v1/v1+)
+18) LAUNCH DASHBOARD AND ENTRY ROUTING (v1)
+
+Learn-by-building walkthroughs (required)
+
+To keep the tool beginner-first, v1 includes in-app guided tutorial projects, not only static docs.
+Each walkthrough is task-based, checks completion automatically, and ends with a playable/exportable result.
+
+Initial walkthrough set
+- Zelda-like room: tilemap + player + NPC dialog + key/door loop
+- Chrono-style town scene: layered map feel + interactables + dialog branch
+- Platformer room: spawn + hazard + goal loop
+
+Workflow rules
+- Every tutorial step links directly to the target control (no menu hunting).
+- Each step includes "what to do", "why it matters", and "expected result".
+- If a step fails, Issues Drawer should provide one-click fix or jump-to control.
+
+Assisted generation for non-artists (v1+ with guarded v1 seed)
+
+Goal: help non-artists create usable starter assets quickly without blocking advanced artists.
+
+v1 seed (lightweight, local-first)
+- Procedural primitive generator for common assets: tree, bush, rock, crate, chest.
+- Output is profile-safe by construction (palette/tile-size constraints enforced).
+- Generated assets are editable in Draw Studio and versioned like normal assets.
+
+v1+ extension
+- Optional prompt-assisted generation (e.g., "small pine tree", "grass bush") mapped to deterministic style templates.
+- Any external/generative pipeline remains opt-in and must pass normal validation before save/export.
+
+Non-negotiables
+- Assisted generation never bypasses profile limits.
+- Users can always inspect/edit generated outputs.
+- Manual pixel workflow stays first-class for artists.
+
+
+------------------------------------------------------------
+18) LAUNCH DASHBOARD AND ENTRY ROUTING (v1)
+
+Purpose
+
+The app should open to a beginner-friendly dashboard first, not directly into a dense editor shell.
+This reduces first-use confusion and improves time-to-first-playable outcome.
+
+Entry states (frontend)
+
+- launch_dashboard (default)
+- editor_workspace
+- playtest_overlay
+
+Dashboard first actions
+
+- New Project
+- Open Project
+- Continue Recent
+- Recover Backup
+
+Dashboard second actions
+
+- Quick Start (10-minute path)
+- Template Gallery (RPG/Platformer/Puzzle/Blank)
+- Learn-by-building walkthrough cards
+
+Creation defaults
+
+- Visual style default: Pixel Classic (was "Game Boy")
+- UI default: Beginner
+- Starter content default: enabled
+
+Implementation constraints (performance)
+
+- Do not mount heavy editor-only controllers while in launch_dashboard.
+- Route transition to editor_workspace should lazy-load editor modules.
+- Dashboard interactions should avoid long main-thread tasks (chunk work and use idle-time where safe).
+- Large recent/template lists should use bounded rendering (windowing/virtualization strategy).
+
+Quality gates for dashboard launch
+
+- Fresh launch opens dashboard by default.
+- New project from dashboard reaches playable starter loop.
+- Recent/recover actions are reachable in <= 2 clicks from launch.
+- Beginner mode hides advanced controls on first editor entry.
+
+Reference implementation spec
+
+- docs/frontend/Launch Dashboard and Entry Flow.md
+
+
+------------------------------------------------------------
+ADR-006: Visual Style vs Hardware Emulation (February 19, 2026)
+
+Status: Accepted
+
+Context:
+The original design used ExportProfile (GameBoy/Nes/Snes) to constrain the editor
+canvas to hardware resolution (160×144, 256×240, 256×224). This caused:
+- Editor viewport was tiny (160×144px at 1x scale)
+- Canvas fill tool computed bounds from the container viewport, producing triangle fills
+- The tool felt like an emulator ROM creator, not a game creation tool
+- Users could not understand why the editor was so small
+
+Decision:
+Separate "visual aesthetic" from "hardware emulation." GCS creates pixel art games
+that RUN at modern resolutions (1280×720 default) and LOOK retro via integer scaling
+and nearest-neighbor rendering — the same approach used by Celeste, Undertale, Shovel Knight.
+
+ExportProfile becomes VisualStyle (or stays named ExportProfile but changes semantics):
+- Defines: tile_size, suggested_palette, pixel_snap, source_resolution_default, scale_default
+- Does NOT lock the editor or game to specific pixel dimensions
+- All values are advisory defaults the user can override
+
+Editor canvas becomes world-space:
+- Pan and zoom freely (25%–800%)
+- "Game screen boundary" shown as a dashed overlay (the source_resolution area)
+- mapMinViewportWidth/Height removed as canvas constraints — map can be any size
+
+Consequences:
++ Editor feels like Tiled/LDtk/Godot, not a constrained emulator tool
++ Users can build large worlds naturally
++ Fill tool computes correct bounds (map content, not viewport container)
++ "Retro aesthetic" is achieved via rendering, not editor constraints
+- Existing project files with profile=game_boy still work (field maps to VisualStyle::PixelClassic)
+- Tests that assume 160×144 source resolution need updating
+
+
+------------------------------------------------------------
+
+END OF DOCUMENT
+

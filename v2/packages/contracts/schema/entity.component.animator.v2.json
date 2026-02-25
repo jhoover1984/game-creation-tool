@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/entity.component.animator.v2.json",
+  "title": "Animator Component V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "controller"],
+  "properties": {
+    "type": { "const": "Animator" },
+    "controller": { "$ref": "common.v2.json#/$defs/ResourceRef" },
+    "playOnStart": { "type": "string" },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": { "type": ["number", "string", "boolean"] }
+    }
+  }
+}

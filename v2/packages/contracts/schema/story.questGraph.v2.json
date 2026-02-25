@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/story.questGraph.v2.json",
+  "title": "Quest Graph V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "nodes", "edges"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "2.0.0" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nodeId", "kind", "name"],
+        "properties": {
+          "nodeId": { "$ref": "common.v2.json#/$defs/Id" },
+          "kind": {
+            "type": "string",
+            "enum": ["start", "objective", "branch", "reward", "end"]
+          },
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "conditions": { "$ref": "story.conditions.v2.json" },
+          "effects": { "$ref": "story.effects.v2.json" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "$ref": "common.v2.json#/$defs/Id" },
+          "to": { "$ref": "common.v2.json#/$defs/Id" },
+          "label": { "type": "string", "maxLength": 120 },
+          "conditions": { "$ref": "story.conditions.v2.json" }
+        }
+      }
+    }
+  }
+}

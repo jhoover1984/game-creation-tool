@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/project.v2.json",
+  "title": "Project V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "name",
+    "engine",
+    "settings",
+    "assets",
+    "maps",
+    "story"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "2.0.0" },
+    "projectId": { "$ref": "common.v2.json#/$defs/Id" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minVersion", "unitsPerMeter", "defaultTimeStep"],
+      "properties": {
+        "minVersion": { "$ref": "common.v2.json#/$defs/SemVer" },
+        "unitsPerMeter": { "type": "number", "minimum": 0.0001 },
+        "defaultTimeStep": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 0.1
+        },
+        "deterministic": { "type": "boolean", "default": true }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["renderMode", "pixel", "locale"],
+      "properties": {
+        "renderMode": {
+          "type": "string",
+          "enum": ["pixelPerfect2D", "hd2D", "hybrid2_5D"]
+        },
+        "pixel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseResolution", "integerScaleOnly"],
+          "properties": {
+            "baseResolution": { "$ref": "common.v2.json#/$defs/Vec2" },
+            "integerScaleOnly": { "type": "boolean" },
+            "paletteLutAsset": { "$ref": "common.v2.json#/$defs/ResourceRef" }
+          }
+        },
+        "locale": { "type": "string", "minLength": 2, "maxLength": 10 },
+        "rngSeed": { "type": "integer" }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": { "$ref": "asset.manifest.v2.json" }
+    },
+    "maps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mapId", "path"],
+        "properties": {
+          "mapId": { "$ref": "common.v2.json#/$defs/Id" },
+          "path": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "story": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questGraph", "dialogue"],
+      "properties": {
+        "questGraph": { "$ref": "story.questGraph.v2.json" },
+        "dialogue": { "$ref": "story.dialogueTruth.v2.json" }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/story.conditions.v2.json",
+  "title": "Story Conditions V2",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["op"],
+    "properties": {
+      "op": {
+        "type": "string",
+        "enum": ["and", "or", "not", "cmp", "hasTag", "questState"]
+      },
+      "key": { "type": "string" },
+      "cmp": { "type": "string", "enum": ["==", "!=", "<", "<=", ">", ">="] },
+      "value": { "type": ["number", "string", "boolean"] },
+      "children": { "$ref": "story.conditions.v2.json" }
+    }
+  }
+}

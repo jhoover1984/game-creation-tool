@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/asset.manifest.v2.json",
+  "title": "Asset Manifest Entry V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assetId", "kind", "name", "path"],
+  "properties": {
+    "assetId": { "$ref": "common.v2.json#/$defs/Id" },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "sprite",
+        "spriteSheet",
+        "animationClip",
+        "animController",
+        "tileset",
+        "item",
+        "characterRig2D",
+        "paletteLut",
+        "material",
+        "particlePreset",
+        "script",
+        "sound",
+        "music"
+      ]
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "path": { "type": "string", "minLength": 3 },
+    "tags": { "type": "array", "items": { "type": "string", "maxLength": 40 } },
+    "hash": { "type": "string", "minLength": 16, "maxLength": 128 }
+  }
+}

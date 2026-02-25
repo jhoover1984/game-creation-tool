@@ -1,0 +1,520 @@
+[
+  {
+    "name": "single_tile_single_entity_frame0",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 16,
+            "y": 16
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 0
+      }
+    }
+  },
+  {
+    "name": "single_tile_single_entity_frame20",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 16,
+            "y": 16
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 20
+      }
+    }
+  },
+  {
+    "name": "multi_tile_multi_entity_midframe",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 3,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 7,
+          "y": 5,
+          "tile_id": 1
+        },
+        {
+          "x": 12,
+          "y": 10,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 16,
+            "y": 16
+          }
+        },
+        {
+          "id": 2,
+          "name": "Entity 2",
+          "position": {
+            "x": 80,
+            "y": 40
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 14
+      }
+    }
+  },
+  {
+    "name": "edge_clamp_entity_positions",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 19,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 18,
+          "y": 16,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 144,
+            "y": 128
+          }
+        },
+        {
+          "id": 2,
+          "name": "Entity 2",
+          "position": {
+            "x": -10,
+            "y": -6
+          }
+        },
+        {
+          "id": 3,
+          "name": "Entity 3",
+          "position": {
+            "x": 172,
+            "y": 156
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 31
+      }
+    }
+  },
+  {
+    "name": "dense_tiles_multi_entity_pathing",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 1,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 2,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 3,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 1,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 2,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 3,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 4,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 4,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 8,
+            "y": 8
+          }
+        },
+        {
+          "id": 2,
+          "name": "Entity 2",
+          "position": {
+            "x": 24,
+            "y": 16
+          }
+        },
+        {
+          "id": 3,
+          "name": "Entity 3",
+          "position": {
+            "x": 40,
+            "y": 24
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 45
+      }
+    }
+  },
+  {
+    "name": "wide_stride_entities_with_corner_tiles",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "tile_id": 1
+        },
+        {
+          "x": 19,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 18,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 19,
+          "y": 1,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 1,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 16,
+          "tile_id": 1
+        },
+        {
+          "x": 19,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 18,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 19,
+          "y": 16,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "id": 2,
+          "name": "Entity 2",
+          "position": {
+            "x": 40,
+            "y": 40
+          }
+        },
+        {
+          "id": 3,
+          "name": "Entity 3",
+          "position": {
+            "x": 80,
+            "y": 72
+          }
+        },
+        {
+          "id": 4,
+          "name": "Entity 4",
+          "position": {
+            "x": 144,
+            "y": 128
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 89
+      }
+    }
+  },
+  {
+    "name": "profile_bounds_stress_layout",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 19,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 0,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 19,
+          "y": 17,
+          "tile_id": 1
+        },
+        {
+          "x": 18,
+          "y": 16,
+          "tile_id": 1
+        },
+        {
+          "x": 2,
+          "y": 16,
+          "tile_id": 1
+        },
+        {
+          "x": 18,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 9,
+          "y": 8,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Entity 1",
+          "position": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "id": 2,
+          "name": "Entity 2",
+          "position": {
+            "x": 40,
+            "y": 36
+          }
+        },
+        {
+          "id": 3,
+          "name": "Entity 3",
+          "position": {
+            "x": 53,
+            "y": 48
+          }
+        },
+        {
+          "id": 4,
+          "name": "Entity 4",
+          "position": {
+            "x": 144,
+            "y": 128
+          }
+        },
+        {
+          "id": 5,
+          "name": "Entity 5",
+          "position": {
+            "x": 172,
+            "y": 0
+          }
+        }
+      ],
+      "entity_components": {},
+      "playtest": {
+        "frame": 113
+      }
+    }
+  }
+]

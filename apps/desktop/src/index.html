@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Creator Studio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="launch-dashboard" class="launch-dashboard">
+      <div class="launch-shell">
+        <header class="launch-hero">
+          <p class="launch-kicker">Studio v1.1 Stable</p>
+          <h1>Game Creator Studio</h1>
+          <p>
+            Build a playable retro game in minutes. Start simple, then unlock advanced tools when
+            you're ready.
+          </p>
+          <div id="dashboard-runtime-mode" class="runtime-mode-badge">Web Mode</div>
+        </header>
+        <section class="launch-card launch-actions">
+          <h2>Start Building</h2>
+          <div class="launch-action-layout">
+            <button id="dashboard-action-new" class="accent launch-action-primary">Create Project</button>
+            <div class="launch-button-row">
+              <button id="dashboard-action-open">Open Project</button>
+              <button id="dashboard-action-continue">Continue Recent</button>
+              <button id="dashboard-action-recover">Recover Backup</button>
+            </div>
+          </div>
+          <div class="launch-form-grid">
+            <label for="dashboard-template-select">Template</label>
+            <select id="dashboard-template-select" aria-label="dashboard-template-select"></select>
+            <label for="dashboard-profile-select">Profile</label>
+            <select id="dashboard-profile-select" aria-label="dashboard-profile-select">
+              <option value="game_boy">Game Boy</option>
+              <option value="nes">NES</option>
+              <option value="snes">SNES</option>
+            </select>
+            <label for="dashboard-ui-mode-select">UI Mode</label>
+            <select id="dashboard-ui-mode-select" aria-label="dashboard-ui-mode-select">
+              <option value="beginner" selected>Beginner</option>
+              <option value="builder">Builder</option>
+            </select>
+          </div>
+          <p id="dashboard-status" class="launch-status" aria-live="polite">
+            Choose a starter and click New or Open.
+          </p>
+          <div class="launch-recent-block">
+            <h3>Recent Projects</h3>
+            <ul id="dashboard-recent-list" class="launch-recent-list">
+              <li>No recent projects yet.</li>
+            </ul>
+          </div>
+        </section>
+        <section class="launch-card launch-templates">
+          <h2>Template Gallery</h2>
+          <div class="launch-template-grid"></div>
+        </section>
+      </div>
+    </section>
+    <div id="editor-workspace" class="app-shell" hidden>
+      <header class="topbar">
+        <div class="brand">Game Creator Studio</div>
+        <div id="runtime-mode-badge" class="runtime-mode-badge">Web Mode</div>
+        <div class="actions">
+          <label for="ui-profile-select" class="sr-only">UI Profile</label>
+          <select id="ui-profile-select" aria-label="ui-profile-select">
+            <option value="builder" selected>Builder UI</option>
+            <option value="beginner">Beginner UI</option>
+          </select>
+          <label for="theme-select" class="sr-only">Theme</label>
+          <select id="theme-select" aria-label="theme-select">
+            <option value="dark" selected>Theme: Dark</option>
+            <option value="light">Theme: Light</option>
+            <option value="dark_high_contrast">Theme: High Contrast</option>
+          </select>
+          <label for="density-select" class="sr-only">Density</label>
+          <select id="density-select" aria-label="density-select">
+            <option value="comfortable" selected>Density: Comfortable</option>
+            <option value="compact">Density: Compact</option>
+          </select>
+          <label for="new-project-template" class="sr-only">Starter Template</label>
+          <select id="new-project-template" aria-label="new-project-template"></select>
+          <button id="panel-toggle-left" aria-label="Hide Left Panel">Hide Left Panel</button>
+          <button id="panel-toggle-right" aria-label="Hide Right Panel">Hide Right Panel</button>
+          <button id="help-toggle" title="Show keyboard shortcuts &amp; tips">Help</button>
+          <button data-command="new" title="New project (Ctrl+N)">New</button>
+          <button data-command="open" title="Open project (Ctrl+O)">Open</button>
+          <button data-command="save" title="Save project (Ctrl+S)">Save</button>
+          <button data-command="play" class="accent" title="Start / stop playtest (F5)">Playtest</button>
+        </div>
+      </header>
+
+      <aside class="left-panel">
+        <section class="panel-card">
+          <h2>Scenes</h2>
+          <ul id="scene-list" class="scene-list">
+            <li class="scene-empty">No scenes yet.</li>
+          </ul>
+          <div class="scene-controls">
+            <input id="scene-name-input" type="text" placeholder="new_scene" aria-label="New scene name" />
+            <button id="scene-add-btn" type="button">Add Scene</button>
+          </div>
+        </section>
+        <section class="panel-card">
+          <h2>Workspace</h2>
+          <ul>
+            <li class="active">Map Editor</li>
+            <li>Draw Studio</li>
+            <li class="profile-advanced">Story Maker</li>
+            <li class="profile-advanced">Animation Lab</li>
+            <li class="profile-advanced">Audio</li>
+          </ul>
+          <p class="workspace-note">
+            Beginner flow: build map, place entities, playtest, then export preview.
+          </p>
+        </section>
+        <section class="panel-card">
+          <h2>Project Health</h2>
+          <p id="health-summary" aria-live="polite">No project loaded.</p>
+        </section>
+        <section class="panel-card">
+          <h2>Quick Start</h2>
+          <p id="onboarding-status" aria-live="polite">Start by choosing a template and clicking New.</p>
+          <p id="onboarding-hint">
+            Use the template picker, then click New to scaffold a starter map.
+          </p>
+          <ul id="onboarding-checklist">
+            <li>Waiting for project setup...</li>
+          </ul>
+          <hr />
+          <div class="profile-advanced">
+            <h3 class="subhead">Assisted Content</h3>
+            <label for="assisted-primitive-select" class="sr-only">assisted-primitive-select</label>
+            <select id="assisted-primitive-select" aria-label="assisted-primitive-select">
+              <option value="tree">Tree</option>
+              <option value="bush">Bush</option>
+              <option value="rock">Rock</option>
+              <option value="crate">Crate</option>
+              <option value="chest">Chest</option>
+            </select>
+            <label for="assisted-profile-select" class="sr-only">assisted-profile-select</label>
+            <select id="assisted-profile-select" aria-label="assisted-profile-select">
+              <option value="game_boy">Game Boy</option>
+              <option value="nes">NES</option>
+              <option value="snes">SNES</option>
+            </select>
+            <div class="walkthrough-controls">
+              <button id="assisted-generate">Generate Primitive</button>
+            </div>
+            <hr />
+          </div>
+          <h3 class="subhead">Guided Walkthrough</h3>
+          <label for="walkthrough-select" class="sr-only">walkthrough-select</label>
+          <select id="walkthrough-select" aria-label="walkthrough-select">
+            <option value="zelda_room">Zelda-like Room</option>
+            <option value="chrono_town">Chrono-style Town</option>
+            <option value="platformer_room">Platformer Room</option>
+            <option value="puzzle_room">Sokoban-style Puzzle Room</option>
+          </select>
+          <div class="walkthrough-controls">
+            <button id="walkthrough-start">Start Walkthrough</button>
+            <button id="walkthrough-run-step">Run Step</button>
+          </div>
+          <p id="walkthrough-status" aria-live="polite">Walkthrough idle.</p>
+          <p id="export-lane-hint" class="workflow-note">
+            Export Preview in the editor runs the authored lane. Canonical parity lane runs in CLI/CI.
+          </p>
+          <ul id="walkthrough-steps">
+            <li>Select a walkthrough and click Start Walkthrough.</li>
+          </ul>
+        </section>
+      </aside>
+
+      <main class="canvas-area">
+        <div class="canvas-header">
+          <h1>Starter Town</h1>
+          <div id="status-hud" class="status-hud">
+            <span id="hud-mode">Edit</span>
+            <span id="hud-tool">Tool: Select</span>
+            <span id="hud-selection">Selected: 0</span>
+          </div>
+          <div class="view-controls">
+            <button id="tool-select" class="active" title="Select tool (V)">Select</button>
+            <button id="tool-paint" title="Paint tile tool (B)">Paint Tile</button>
+            <button id="tool-erase" title="Erase tile tool (E)">Erase Tile</button>
+            <button id="tool-fill" title="Fill tile tool (G)">Fill</button>
+            <button id="map-create" title="Add entity (A)">Add Entity</button>
+            <button id="map-move" class="profile-advanced" title="Move selected entities">Move Selected</button>
+            <button id="map-delete" class="danger profile-advanced" title="Delete selected (Del)">Delete Selected</button>
+            <button id="map-undo" class="profile-advanced" title="Undo (Ctrl+Z)">Undo</button>
+            <button id="map-redo" class="profile-advanced" title="Redo (Ctrl+Y)">Redo</button>
+            <button id="map-reselect" class="profile-advanced" title="Reselect previous (Alt+Z)">Reselect</button>
+            <span id="tile-palette" class="tile-palette" aria-label="Tile palette">
+              <button class="tile-swatch active" data-tile-id="1" title="Tile 1" style="background:var(--tile-color-1, #5b8c3e)"></button>
+              <button class="tile-swatch" data-tile-id="2" title="Tile 2" style="background:var(--tile-color-2, #3e6b8c)"></button>
+              <button class="tile-swatch" data-tile-id="3" title="Tile 3" style="background:var(--tile-color-3, #8c5b3e)"></button>
+              <button class="tile-swatch" data-tile-id="4" title="Tile 4" style="background:var(--tile-color-4, #6b3e8c)"></button>
+              <button class="tile-swatch" data-tile-id="5" title="Tile 5" style="background:var(--tile-color-5, #8c8c3e)"></button>
+              <button class="tile-swatch" data-tile-id="6" title="Tile 6" style="background:var(--tile-color-6, #3e8c8c)"></button>
+            </span>
+          <button id="overlay-grid">Grid</button>
+            <button id="overlay-collision" class="profile-advanced">Collision</button>
+            <button id="overlay-ids" class="profile-advanced">IDs</button>
+            <button id="map-zoom-fit" class="profile-advanced">Map Fit</button>
+            <button id="map-zoom-1x" class="active profile-advanced">Map 1x</button>
+            <button id="map-zoom-2x" class="profile-advanced">Map 2x</button>
+            <button id="map-zoom-3x" class="profile-advanced">Map 3x</button>
+          </div>
+        </div>
+        <div class="canvas-surface" aria-label="map-canvas">
+          <div class="grid-overlay"></div>
+          <div id="playtest-viewport-wrap" class="playtest-viewport-wrap" hidden>
+            <canvas
+              id="playtest-viewport"
+              width="160"
+              height="144"
+              aria-label="playtest-viewport"
+            ></canvas>
+          </div>
+          <div id="playtest-overlay" class="playtest-overlay" hidden>
+            <div class="playtest-controls">
+              <strong>Playtest Mode</strong>
+              <span class="playtest-exit-hint">Press Esc to exit</span>
+              <button id="playtest-pause">Pause</button>
+              <button id="playtest-step">Step</button>
+              <button id="playtest-speed-1x">1x</button>
+              <button id="playtest-speed-half">0.5x</button>
+              <button id="playtest-speed-quarter">0.25x</button>
+              <button id="playtest-zoom-fit">Fit</button>
+              <button id="playtest-zoom-2x">2x View</button>
+              <button id="playtest-zoom-3x">3x View</button>
+              <button id="playtest-zoom-4x">4x View</button>
+              <button id="playtest-trace">Trace</button>
+              <button id="bp-tick">BP Tick</button>
+              <button id="bp-item">BP Item</button>
+              <button id="bp-quest">BP Quest</button>
+              <button id="playtest-exit" class="danger">Exit</button>
+            </div>
+            <div class="playtest-metrics">
+              <span id="playtest-metric-frame">Frame: 0</span>
+              <span id="playtest-metric-delta">Tick: 0ms</span>
+              <span id="playtest-metric-steps">Steps: 0</span>
+              <span id="playtest-metric-break">Break: none</span>
+              <span id="playtest-metric-feedback"
+                >Feedback: first frame pending | last update pending</span
+              >
+            </div>
+          </div>
+          <div id="tile-layer" class="tile-layer" aria-label="map-tiles"></div>
+          <div id="entity-layer" class="entity-layer" aria-label="map-entities"></div>
+          <div id="marquee-box" class="marquee-box" aria-hidden="true"></div>
+          <section id="help-overlay" class="help-overlay" hidden>
+            <h3 id="help-context">Map Help</h3>
+            <div class="help-tour-controls">
+              <button id="help-tour-start">Start Tour</button>
+              <button id="help-tour-prev">Back</button>
+              <button id="help-tour-next">Next</button>
+              <button id="help-tour-do">Do It</button>
+              <button id="help-tour-stop" class="danger">Stop</button>
+            </div>
+            <p id="help-tour-status">Tour idle.</p>
+            <ul id="help-list">
+              <li>Use Add Entity to place a starter object.</li>
+            </ul>
+          </section>
+          <div class="canvas-empty-state" id="canvas-empty-state">
+            <h3>Map Surface</h3>
+            <p>Nothing here yet. Get started:</p>
+            <div class="canvas-empty-actions">
+              <button id="empty-state-add-entity" class="canvas-empty-cta accent">Add Entity <kbd>A</kbd></button>
+              <button id="empty-state-paint-tile" class="canvas-empty-cta">Paint Tile <kbd>B</kbd></button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside class="right-panel">
+        <div
+          id="right-panel-tabs"
+          class="right-panel-tabs"
+          role="tablist"
+          aria-label="Right panel tabs"
+        >
+          <button
+            id="right-tab-inspector"
+            class="right-panel-tab active"
+            data-right-panel-tab="inspector"
+            role="tab"
+            aria-selected="true"
+          >
+            Inspector
+          </button>
+          <button
+            id="right-tab-draw"
+            class="right-panel-tab"
+            data-right-panel-tab="draw"
+            role="tab"
+            aria-selected="false"
+          >
+            Draw
+          </button>
+          <button
+            id="right-tab-animation"
+            class="right-panel-tab profile-advanced"
+            data-right-panel-tab="animation"
+            role="tab"
+            aria-selected="false"
+          >
+            Animation
+          </button>
+          <button
+            id="right-tab-script"
+            class="right-panel-tab"
+            data-right-panel-tab="script"
+            role="tab"
+            aria-selected="false"
+          >
+            Script
+          </button>
+          <button
+            id="right-tab-issues"
+            class="right-panel-tab"
+            data-right-panel-tab="issues"
+            role="tab"
+            aria-selected="false"
+          >
+            Issues
+          </button>
+          <button
+            id="right-tab-export"
+            class="right-panel-tab"
+            data-right-panel-tab="export"
+            role="tab"
+            aria-selected="false"
+          >
+            Export
+          </button>
+        </div>
+        <section class="panel-card" data-right-panel-section data-right-panel-group="inspector">
+          <h2>Inspector</h2>
+          <div class="field-row">
+            <label>Name</label>
+            <input type="text" value="Player" />
+          </div>
+          <div class="field-row">
+            <label>X</label>
+            <input type="number" value="48" />
+          </div>
+          <div class="field-row">
+            <label>Y</label>
+            <input type="number" value="64" />
+          </div>
+        </section>
+        <section class="panel-card" data-right-panel-section data-right-panel-group="inspector">
+          <h2>Map Entities</h2>
+          <ul id="entity-list">
+            <li>No entities.</li>
+          </ul>
+        </section>
+        <section class="panel-card" data-right-panel-section data-right-panel-group="inspector">
+          <h2>Components</h2>
+          <div id="component-inspector">
+            <p id="component-empty">Select an entity to view components.</p>
+            <div id="component-details" hidden>
+              <div class="component-section" id="component-collision-section" hidden>
+                <h3 class="subhead">Collision Box</h3>
+                <div class="field-row">
+                  <label for="comp-collision-enabled">Enabled</label>
+                  <input id="comp-collision-enabled" type="checkbox" />
+                </div>
+                <div class="field-row">
+                  <label for="comp-collision-solid-input">Solid</label>
+                  <input id="comp-collision-solid-input" type="checkbox" />
+                </div>
+                <div class="field-row">
+                  <label for="comp-collision-width">Width</label>
+                  <input id="comp-collision-width" type="number" min="1" step="1" />
+                </div>
+                <div class="field-row">
+                  <label for="comp-collision-height">Height</label>
+                  <input id="comp-collision-height" type="number" min="1" step="1" />
+                </div>
+                <div class="field-row">
+                  <label for="comp-collision-offset-x">Offset X</label>
+                  <input id="comp-collision-offset-x" type="number" step="1" />
+                </div>
+                <div class="field-row">
+                  <label for="comp-collision-offset-y">Offset Y</label>
+                  <input id="comp-collision-offset-y" type="number" step="1" />
+                </div>
+                <div class="field-row">
+                  <button id="comp-collision-save" type="button">Save Collision</button>
+                </div>
+              </div>
+              <div class="component-section" id="component-sprite-section" hidden>
+                <h3 class="subhead">Sprite</h3>
+                <div class="field-row"><label>Asset</label><span id="comp-sprite-asset">-</span></div>
+                <div class="field-row"><label>Frame</label><span id="comp-sprite-frame">-</span></div>
+              </div>
+              <div class="component-section" id="component-movement-section" hidden>
+                <h3 class="subhead">Movement</h3>
+                <span id="comp-movement-status">Attached</span>
+              </div>
+              <div class="component-section" id="component-velocity-section" hidden>
+                <h3 class="subhead">Velocity / Physics</h3>
+                <span id="comp-velocity-status">Attached</span>
+              </div>
+            </div>
+            <p id="component-status" aria-live="polite">Ready.</p>
+          </div>
+        </section>
+        <section
+          class="panel-card profile-advanced"
+          data-right-panel-section
+          data-right-panel-group="draw"
+        >
+          <h2>Draw Studio Seed</h2>
+          <p id="draw-seed-summary">Generate primitive starter art directly from Draw workflow.</p>
+          <label for="draw-assisted-primitive-select" class="sr-only"
+            >draw-assisted-primitive-select</label
+          >
+          <select id="draw-assisted-primitive-select" aria-label="draw-assisted-primitive-select">
+            <option value="tree">Tree</option>
+            <option value="bush">Bush</option>
+            <option value="rock">Rock</option>
+            <option value="crate">Crate</option>
+            <option value="chest">Chest</option>
+          </select>
+          <label for="draw-assisted-profile-select" class="sr-only"
+            >draw-assisted-profile-select</label
+          >
+          <select id="draw-assisted-profile-select" aria-label="draw-assisted-profile-select">
+            <option value="game_boy">Game Boy</option>
+            <option value="nes">NES</option>
+            <option value="snes">SNES</option>
+          </select>
+          <div class="draw-seed-grid">
+            <label for="draw-assisted-offset-x">Offset X</label>
+            <input
+              id="draw-assisted-offset-x"
+              type="number"
+              value="1"
+              min="0"
+              aria-label="draw-assisted-offset-x"
+            />
+            <label for="draw-assisted-offset-y">Offset Y</label>
+            <input
+              id="draw-assisted-offset-y"
+              type="number"
+              value="1"
+              min="0"
+              aria-label="draw-assisted-offset-y"
+            />
+          </div>
+          <label class="draw-seed-toggle" for="draw-assisted-mirror-x">
+            <input
+              id="draw-assisted-mirror-x"
+              type="checkbox"
+              aria-label="draw-assisted-mirror-x"
+            />
+            Mirror X
+          </label>
+          <div class="draw-seed-presets">
+            <button id="draw-seed-preset-tree" type="button">Tree</button>
+            <button id="draw-seed-preset-bush" type="button">Bush</button>
+            <button id="draw-seed-preset-rock" type="button">Rock</button>
+            <button id="draw-seed-preset-cluster" type="button">Cluster</button>
+            <button id="draw-seed-preset-line" type="button">Line</button>
+            <button id="draw-seed-preset-ring" type="button">Ring</button>
+          </div>
+          <div class="draw-seed-preset-manager">
+            <select id="draw-seed-preset-select" aria-label="draw-seed-preset-select"></select>
+            <button id="draw-seed-preset-apply" type="button">Apply</button>
+            <button id="draw-seed-preset-delete" type="button">Delete</button>
+          </div>
+          <div class="draw-seed-preset-manager">
+            <input
+              id="draw-seed-preset-name"
+              type="text"
+              placeholder="preset_name"
+              aria-label="draw-seed-preset-name"
+            />
+            <button id="draw-seed-preset-save" type="button">Save</button>
+            <button id="draw-seed-preset-copy" type="button">Copy</button>
+            <button id="draw-seed-preset-export" type="button">Export</button>
+            <button id="draw-seed-preset-import" type="button">Import</button>
+          </div>
+          <textarea
+            id="draw-seed-preset-json"
+            class="draw-seed-preset-json"
+            aria-label="draw-seed-preset-json"
+            placeholder='{"name":"my_preset","points":[{"x":0,"y":0}]}'
+          ></textarea>
+          <div id="draw-seed-canvas" class="draw-seed-canvas" aria-label="draw-seed-canvas"></div>
+          <ul id="draw-seed-preview">
+            <li>Draft preview will appear here.</li>
+          </ul>
+          <div class="walkthrough-controls">
+            <button id="draw-assisted-generate">Apply Draft To Map</button>
+          </div>
+        </section>
+        <section
+          class="panel-card profile-advanced"
+          data-right-panel-section
+          data-right-panel-group="animation"
+        >
+          <h2>Flipbook Studio (Preview)</h2>
+          <p id="flipbook-summary">
+            Build frame strips for entity clips. Full editing tools (onion skin + timing graph) are next.
+          </p>
+          <div class="field-row">
+            <label for="flipbook-clip-select">Clip</label>
+            <select id="flipbook-clip-select" aria-label="flipbook-clip-select">
+              <option value="">No clip selected</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="flipbook-frame-duration">Frame Ticks</label>
+            <input
+              id="flipbook-frame-duration"
+              type="number"
+              min="1"
+              step="1"
+              value="8"
+              aria-label="flipbook-frame-duration"
+            />
+          </div>
+          <div class="field-row">
+            <label for="flipbook-loop-mode">Loop Mode</label>
+            <select id="flipbook-loop-mode" aria-label="flipbook-loop-mode">
+              <option value="loop">Loop</option>
+              <option value="once">Once</option>
+              <option value="ping_pong">Ping Pong</option>
+            </select>
+          </div>
+          <div class="flipbook-toolbar">
+            <button id="flipbook-clip-add" type="button">New Clip</button>
+            <button id="flipbook-clip-rename" type="button">Rename</button>
+            <button id="flipbook-clip-delete" type="button" class="danger">Delete</button>
+          </div>
+          <div id="flipbook-frame-strip" class="flipbook-frame-strip" aria-label="flipbook-frame-strip">
+            <p class="flipbook-empty">No frames yet. Add frames from selected sprite sheet.</p>
+          </div>
+          <div class="field-row">
+            <label for="flipbook-scrub">Scrub</label>
+            <input
+              id="flipbook-scrub"
+              type="range"
+              min="0"
+              max="0"
+              step="1"
+              value="0"
+              aria-label="flipbook-scrub"
+            />
+          </div>
+          <p id="flipbook-scrub-label" class="flipbook-scrub-label">Frame: -</p>
+          <div class="flipbook-toolbar">
+            <button id="flipbook-frame-add" type="button">Add Frame</button>
+            <button id="flipbook-frame-remove" type="button">Remove Frame</button>
+            <button id="flipbook-frame-duplicate" type="button">Duplicate</button>
+            <button id="flipbook-frame-left" type="button">Move Left</button>
+            <button id="flipbook-frame-right" type="button">Move Right</button>
+            <label for="flipbook-preview-speed">Preview Speed</label>
+            <select id="flipbook-preview-speed" aria-label="flipbook-preview-speed">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+            </select>
+            <button id="flipbook-preview-toggle" type="button">Preview</button>
+          </div>
+          <p id="flipbook-status" aria-live="polite">Flipbook studio ready.</p>
+        </section>
+        <section
+          class="panel-card profile-advanced"
+          data-right-panel-section
+          data-right-panel-group="script"
+        >
+          <h2>Runtime Watch</h2>
+          <div id="watch-selected">No selected entity.</div>
+          <div class="watch-filters">
+            <button id="watch-filter-all" class="active">All</button>
+            <button id="watch-filter-flags">Flags</button>
+            <button id="watch-filter-vars">Vars</button>
+            <button id="watch-filter-inventory">Inventory</button>
+          </div>
+          <ul id="watch-flags">
+            <li>No watch flags.</li>
+          </ul>
+        </section>
+        <section
+          class="panel-card profile-advanced"
+          data-right-panel-section
+          data-right-panel-group="script"
+        >
+          <h2>Event Sheet</h2>
+          <p class="event-graph-hint">Visual event rules for the selected entity.</p>
+          <div class="event-graph-toolbar">
+            <button id="event-graph-add-rule">+ Add Rule</button>
+            <button id="event-graph-pick-template">Templates</button>
+          </div>
+          <div id="event-graph-template-picker" class="event-graph-template-picker" hidden>
+            <p class="event-graph-template-label">Apply a starter template:</p>
+            <button class="event-graph-template-btn" data-template="entity_chest_give_item">Chest: Give Item</button>
+            <button class="event-graph-template-btn" data-template="entity_door_require_item">Door: Require Item</button>
+            <button class="event-graph-template-btn" data-template="entity_npc_greeting">NPC: Simple Greeting</button>
+          </div>
+          <ul id="event-graph-rule-list" class="event-graph-rule-list">
+            <li class="event-graph-empty">Select an entity, then add rules or apply a template.</li>
+          </ul>
+          <p id="event-graph-status" class="event-graph-status" aria-live="polite"></p>
+        </section>
+        <section
+          class="panel-card profile-advanced"
+          data-right-panel-section
+          data-right-panel-group="script"
+        >
+          <h2>Script Lab</h2>
+          <p id="script-validation-summary">Paste graph JSON and validate.</p>
+          <div class="script-template-row">
+            <label for="script-template-select">Template</label>
+            <select id="script-template-select" aria-label="script-template-select"></select>
+            <button id="script-template-use">Use</button>
+            <button id="script-template-delete" class="danger">Delete</button>
+          </div>
+          <div class="script-template-row">
+            <label for="script-template-name">Save As</label>
+            <input
+              id="script-template-name"
+              class="script-template-name"
+              type="text"
+              placeholder="my_template"
+              aria-label="script-template-name"
+            />
+            <button id="script-template-save">Save</button>
+          </div>
+          <textarea
+            id="script-graph-input"
+            class="script-input"
+            aria-label="script-graph-input"
+          ></textarea>
+          <button id="script-validate">Validate Graph</button>
+        </section>
+        <section
+          class="panel-card profile-advanced"
+          data-right-panel-section
+          data-right-panel-group="script"
+        >
+          <h2>Audio Routing</h2>
+          <p class="audio-routing-hint">Map gameplay events to audio clips for export.</p>
+          <div id="audio-bindings-list" class="audio-bindings-list">
+            <p class="audio-bindings-empty">No audio bindings. Add one below or define in script graph.</p>
+          </div>
+          <div class="audio-binding-add">
+            <div class="field-row">
+              <label for="audio-event-input">Event</label>
+              <select id="audio-event-input" aria-label="Gameplay event">
+                <option value="">-- select --</option>
+                <option value="interact">interact</option>
+                <option value="item_pickup">item_pickup</option>
+                <option value="door_open">door_open</option>
+                <option value="combat_hit">combat_hit</option>
+                <option value="quest_complete">quest_complete</option>
+                <option value="scene_enter">scene_enter</option>
+                <option value="player_death">player_death</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="audio-clip-input">Clip ID</label>
+              <input id="audio-clip-input" type="text" placeholder="audio_sfx_click" aria-label="Audio clip ID" />
+            </div>
+            <button id="audio-binding-add-btn" type="button">Add Binding</button>
+          </div>
+          <p id="audio-routing-status" aria-live="polite">Ready.</p>
+        </section>
+        <section class="panel-card issues" data-right-panel-section data-right-panel-group="issues">
+          <h2>Issues Drawer</h2>
+          <ul id="issues-list" aria-live="polite">
+            <li>No issues.</li>
+          </ul>
+        </section>
+        <section class="panel-card" data-right-panel-section data-right-panel-group="export" hidden>
+          <h2>Export</h2>
+          <p>Export your project as a playable HTML5 game.</p>
+          <div class="field-row">
+            <label for="export-profile-select">Profile</label>
+            <select id="export-profile-select" aria-label="Export profile">
+              <option value="game_boy">Game Boy</option>
+              <option value="nes">NES</option>
+              <option value="snes">SNES</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label>
+              <input id="export-debug-check" type="checkbox" /> Debug mode
+            </label>
+          </div>
+          <button id="export-run" class="accent">Export HTML5 Preview</button>
+          <p id="export-status" aria-live="polite">Ready to export.</p>
+        </section>
+      </aside>
+
+      <footer class="log-dock">
+        <strong>Log Console</strong>
+        <div id="log-lines" aria-live="polite">Ready.</div>
+        <div id="trace-filters" class="trace-filters">
+          <button data-trace-filter="all" class="active">All</button>
+          <button data-trace-filter="breakpoint">Breakpoints</button>
+          <button data-trace-filter="playtest_tick">Ticks</button>
+          <button data-trace-filter="item_pickup">Item</button>
+          <button data-trace-filter="quest_state">Quest</button>
+        </div>
+        <ul id="trace-lines" class="trace-lines">
+          <li>No trace events.</li>
+        </ul>
+      </footer>
+    </div>
+    <div id="walkthrough-focus-hint" class="walkthrough-focus-hint" hidden>
+      <p id="walkthrough-focus-title">Current step</p>
+      <p id="walkthrough-focus-why"></p>
+      <p id="walkthrough-focus-expected"></p>
+    </div>
+
+    <div id="toast-region" role="status" aria-live="polite" aria-atomic="false"></div>
+    <script src="./ui-shell.js" type="module"></script>
+  </body>
+</html>

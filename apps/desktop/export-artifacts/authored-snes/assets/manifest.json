@@ -1,0 +1,36 @@
+{
+  "asset_count": 4,
+  "assets": [
+    {
+      "id": "tile_1",
+      "kind": "tile",
+      "label": "Tile 1",
+      "path": "assets/starter/tile_1.svg",
+      "source": "starter_pack://tiles/1"
+    },
+    {
+      "id": "tile_2",
+      "kind": "tile",
+      "label": "Tile 2",
+      "path": "assets/starter/tile_2.svg",
+      "source": "starter_pack://tiles/2"
+    },
+    {
+      "id": "entity_crate_snes",
+      "kind": "entity_sprite",
+      "label": "Crate snes",
+      "path": "assets/generated/entity_crate_snes.svg",
+      "source": "generated://entities/crate_snes"
+    },
+    {
+      "id": "entity_player_snes",
+      "kind": "entity_sprite",
+      "label": "Player snes",
+      "path": "assets/generated/entity_player_snes.svg",
+      "source": "generated://entities/player_snes"
+    }
+  ],
+  "generated_by": "gcs-export-core",
+  "profile": "snes",
+  "schema_version": 1
+}

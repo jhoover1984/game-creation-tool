@@ -1,0 +1,332 @@
+{
+  "projectDir": ".",
+  "projectName": "Puzzle Starter",
+  "health": {
+    "warnings": [
+      "Running in web fallback mode (no Tauri backend connected)."
+    ],
+    "near_limits": [],
+    "missing_assets": [],
+    "trashed_refs": []
+  },
+  "migrationReport": null,
+  "entities": [
+    {
+      "id": 1,
+      "name": "Player",
+      "position": {
+        "x": 16,
+        "y": 16
+      }
+    },
+    {
+      "id": 2,
+      "name": "Crate Prop (GB)",
+      "position": {
+        "x": 80,
+        "y": 32
+      }
+    },
+    {
+      "id": 3,
+      "name": "Crate Prop (GB)",
+      "position": {
+        "x": 128,
+        "y": 48
+      }
+    },
+    {
+      "id": 4,
+      "name": "Rock Prop (GB)",
+      "position": {
+        "x": 112,
+        "y": 80
+      }
+    }
+  ],
+  "tiles": [
+    {
+      "x": 2,
+      "y": 2,
+      "tile_id": 1
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "tile_id": 1
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "tile_id": 1
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "tile_id": 1
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "tile_id": 1
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "tile_id": 1
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "tile_id": 1
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "tile_id": 1
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 8,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 9,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "tile_id": 1
+    },
+    {
+      "x": 9,
+      "y": 4,
+      "tile_id": 1
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "tile_id": 1
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "tile_id": 1
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "tile_id": 1
+    },
+    {
+      "x": 10,
+      "y": 2,
+      "tile_id": 1
+    },
+    {
+      "x": 10,
+      "y": 3,
+      "tile_id": 1
+    },
+    {
+      "x": 10,
+      "y": 4,
+      "tile_id": 1
+    }
+  ],
+  "selection": [
+    4
+  ],
+  "canUndo": true,
+  "canRedo": false,
+  "playtestTrace": [
+    {
+      "seq": 1,
+      "frame": 0,
+      "kind": "playtest_trace",
+      "message": "Trace enabled"
+    },
+    {
+      "seq": 2,
+      "frame": 125,
+      "kind": "playtest_tick",
+      "message": "Ticked 125 step(s) from 2100ms"
+    },
+    {
+      "seq": 3,
+      "frame": 125,
+      "kind": "breakpoint:item_pickup",
+      "message": "Paused on item_pickup"
+    }
+  ],
+  "watchSelectedEntity": {
+    "id": 4,
+    "name": "Rock Prop (GB)",
+    "position": {
+      "x": 112,
+      "y": 80
+    }
+  },
+  "watchFlags": [
+    {
+      "key": "has_started_playtest",
+      "value": true
+    },
+    {
+      "key": "player_has_key",
+      "value": true
+    },
+    {
+      "key": "quest_intro_active",
+      "value": true
+    },
+    {
+      "key": "quest_intro_completed",
+      "value": false
+    }
+  ],
+  "watchVariables": [
+    {
+      "key": "player_hp",
+      "value": 3
+    },
+    {
+      "key": "player_coins",
+      "value": 0
+    },
+    {
+      "key": "quest_stage",
+      "value": 0
+    }
+  ],
+  "watchInventory": [
+    {
+      "key": "key_item",
+      "value": 1
+    },
+    {
+      "key": "potion",
+      "value": 1
+    }
+  ],
+  "watchSceneFlags": [],
+  "watchSceneVariables": [],
+  "watchSelectedFlags": [
+    {
+      "key": "selected_is_player",
+      "value": true
+    },
+    {
+      "key": "selected_in_viewport",
+      "value": true
+    },
+    {
+      "key": "selected_on_grid4",
+      "value": true
+    }
+  ],
+  "watchSelectedVariables": [
+    {
+      "key": "selected_id",
+      "value": 4
+    },
+    {
+      "key": "selected_x",
+      "value": 112
+    },
+    {
+      "key": "selected_y",
+      "value": 80
+    }
+  ],
+  "watchSelectedInventory": [
+    {
+      "key": "selected_debug_tag",
+      "value": 1
+    },
+    {
+      "key": "selected_key_item",
+      "value": 1
+    }
+  ],
+  "playtestBreakpoints": [
+    {
+      "key": "playtest_tick",
+      "value": false
+    },
+    {
+      "key": "item_pickup",
+      "value": true
+    },
+    {
+      "key": "quest_state",
+      "value": false
+    },
+    {
+      "key": "script_event",
+      "value": false
+    }
+  ],
+  "lastBreakpointHit": {
+    "seq": 3,
+    "frame": 125,
+    "kind": "breakpoint:item_pickup",
+    "message": "Paused on item_pickup"
+  },
+  "playtest": {
+    "active": true,
+    "paused": true,
+    "speed": 1,
+    "frame": 125,
+    "trace_enabled": true,
+    "last_tick_delta_ms": 2100,
+    "last_tick_steps": 125
+  },
+  "scenes": [],
+  "activeSceneId": null,
+  "selectedComponents": null,
+  "audioBindings": {},
+  "cameraX": 0,
+  "cameraY": 0,
+  "cameraMode": "fixed",
+  "transitionActive": false,
+  "transitionOpacity": 0,
+  "tilePreviews": {},
+  "spriteRegistry": {},
+  "diagnostics": {
+    "grid": true,
+    "collision": false,
+    "ids": false,
+    "trace": false
+  },
+  "scriptValidation": {
+    "parseError": null,
+    "errors": [],
+    "lastInput": ""
+  },
+  "lastError": null,
+  "exportPreviewReport": null,
+  "runtimeMode": "web"
+}

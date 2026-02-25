@@ -1,0 +1,18 @@
+{
+    "name":  "@gcs/ui-editor",
+    "version":  "0.1.0",
+    "private":  true,
+    "type":  "module",
+    "main":  "dist/index.js",
+    "types":  "dist/index.d.ts",
+    "scripts":  {
+                    "build":  "tsc --build",
+                    "dev":  "tsc --build --watch",
+                    "test":  "node --test dist/**/*.test.js",
+                    "pretest":  "tsc --build tsconfig.test.json"
+                },
+    "dependencies":  {
+                         "@gcs/contracts":  "0.1.0",
+                         "@gcs/runtime-web":  "0.1.0"
+                     }
+}

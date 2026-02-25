@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gcs.dev/schema/entity.component.v2.json",
+  "title": "Entity Component V2",
+  "oneOf": [
+    { "$ref": "entity.component.spriteRenderer.v2.json" },
+    { "$ref": "entity.component.animator.v2.json" },
+    { "$ref": "entity.component.collider2d.v2.json" }
+  ]
+}

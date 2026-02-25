@@ -1,0 +1,11 @@
+{
+  "audio_bindings": {
+    "battle_start": "audio_theme",
+    "item_pickup": "audio_pickup",
+    "ui_open": "audio_theme"
+  },
+  "mode": "release",
+  "profile": "game_boy",
+  "scene_count": 1,
+  "schema_version": 1
+}

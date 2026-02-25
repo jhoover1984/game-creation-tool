@@ -1,0 +1,143 @@
+/* =====================================================================
+   PRIMITIVE TOKENS + SEMANTIC ALIASES
+   UI-VISUAL-001 (baseline), UI-VISUAL-002 (extracted from app.html)
+
+   Rules:
+   - Only this file may define --prim-* raw values.
+   - All component/layout/workspace selectors must consume semantic
+     aliases (--bg-*, --text-*, --border-*, etc.) only.
+   ===================================================================== */
+:root {
+  /* Primitive Color */
+  --prim-navy-900: #1a1a2e;
+  --prim-navy-800: #121426;
+  --prim-navy-700: #16213e;
+  --prim-navy-600: #1b1f35;
+  --prim-blue-700: #0f3460;
+  --prim-blue-600: #1a5276;
+  --prim-blue-500: #2980b9;
+  --prim-blue-400: #5dade2;
+
+  --prim-slate-200: #e0e0e0;
+  --prim-slate-300: #93a0c9;
+  --prim-slate-400: #97a1c6;
+
+  --prim-border-base:    #333;
+  --prim-border-control: #444;
+  --prim-border-panel:   #2a2f4b;
+  --prim-border-input:   #3a415d;
+
+  --prim-green-bg:  #1a5e3a;
+  --prim-green-txt: #6fcf97;
+  --prim-amber-bg:  #5e4b1a;
+  --prim-amber-txt: #f2c94c;
+  --prim-red-bg:    #5e1a1a;
+  --prim-red-txt:   #eb5757;
+
+  --prim-blue-chip-border: #2a4a7a;
+
+  --prim-overlay: rgba(10, 12, 28, 0.96);
+
+  /* Primitive Typography */
+  --prim-font-ui:   'Segoe UI', system-ui, sans-serif;
+  --prim-font-mono: 'Consolas', 'Cascadia Code', monospace;
+  --prim-size-xs:   11px;
+  --prim-size-sm:   12px;
+  --prim-size-md:   13px;
+  --prim-size-lg:   14px;
+  --prim-size-xl:   18px;
+
+  /* Primitive Spacing (8px base scale) */
+  --prim-sp-1: 4px;
+  --prim-sp-2: 8px;
+  --prim-sp-3: 12px;
+  --prim-sp-4: 16px;
+  --prim-sp-5: 24px;
+
+  /* Primitive Radius */
+  --prim-r-sm: 3px;
+  --prim-r-md: 4px;
+  --prim-r-lg: 8px;
+
+  /* Primitive Motion */
+  --prim-duration-fast:   0.1s;
+  --prim-duration-normal: 0.2s;
+  --prim-easing:          ease;
+
+  /* ===================================================================
+     SEMANTIC ALIASES -- components consume these only
+     =================================================================== */
+
+  /* Backgrounds */
+  --bg-base:         var(--prim-navy-900);
+  --bg-surface:      var(--prim-navy-800);
+  --bg-raised:       var(--prim-navy-700);
+  --bg-input:        var(--prim-navy-600);
+  --bg-accent:       var(--prim-blue-700);
+  --bg-accent-hover: var(--prim-blue-600);
+
+  /* Text */
+  --text-primary: var(--prim-slate-200);
+  --text-muted:   var(--prim-slate-400);
+  --text-heading: var(--prim-slate-300);
+
+  /* Borders */
+  --border:         var(--prim-border-base);
+  --border-control: var(--prim-border-control);
+  --border-panel:   var(--prim-border-panel);
+  --border-input:      var(--prim-border-input);
+  --border-chip:       var(--prim-blue-chip-border);
+
+  /* Status */
+  --status-ok-bg:     var(--prim-green-bg);
+  --status-ok-text:   var(--prim-green-txt);
+  --status-warn-bg:   var(--prim-amber-bg);
+  --status-warn-text: var(--prim-amber-txt);
+  --status-err-bg:    var(--prim-red-bg);
+  --status-err-text:  var(--prim-red-txt);
+
+  /* Progress */
+  --color-progress: var(--prim-blue-500);
+
+  /* Overlays */
+  --overlay-scrim: var(--prim-overlay);
+
+  /* Typography */
+  --font-ui:    var(--prim-font-ui);
+  --font-mono:  var(--prim-font-mono);
+  --text-xs:    var(--prim-size-xs);
+  --text-sm:    var(--prim-size-sm);
+  --text-lg:    var(--prim-size-lg);
+  --text-xl:    var(--prim-size-xl);
+
+  /* Spacing */
+  --sp-1: var(--prim-sp-1);
+  --sp-2: var(--prim-sp-2);
+  --sp-3: var(--prim-sp-3);
+  --sp-4: var(--prim-sp-4);
+  --sp-5: var(--prim-sp-5);
+
+  /* Radius */
+  --r-sm: var(--prim-r-sm);
+  --r-md: var(--prim-r-md);
+  --r-lg: var(--prim-r-lg);
+
+  /* Layout */
+  --panel-padding:   var(--prim-sp-2);
+  --section-gap:     var(--prim-sp-3);
+  --inspector-width: 260px;
+  --row-gap:         var(--prim-sp-1);
+  --control-height:  28px;
+
+  /* Motion */
+  --duration-fast:   var(--prim-duration-fast);
+  --duration-normal: var(--prim-duration-normal);
+  --easing:          var(--prim-easing);
+
+  /* Focus + accent highlight (UI-VISUAL-003: --prim-blue-400 semantic alias) */
+  --focus-ring:       0 0 0 2px var(--prim-blue-400);
+  --accent-highlight: var(--prim-blue-400);
+
+  /* Interaction states (UI-VISUAL-004) */
+  --opacity-disabled: 0.4;
+}

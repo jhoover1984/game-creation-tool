@@ -1,0 +1,17 @@
+{
+  "name": "@gcs/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "pretest": "tsc --build tsconfig.test.json",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

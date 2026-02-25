@@ -1,0 +1,11 @@
+{
+  "assets": "assets/manifest.json",
+  "entrypoint": "index.html",
+  "kind": "html5_profile_preview",
+  "metadata": "metadata.json",
+  "mode": "release",
+  "profile": "snes",
+  "runtime": "runtime.js",
+  "scenes": "scenes.json",
+  "schema_version": 1
+}

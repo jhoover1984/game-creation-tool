@@ -1,0 +1,54 @@
+[
+  {
+    "name": "authored_map_preview",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 0,
+          "y": 0,
+          "tile_id": 1
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "tile_id": 2
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Player game_boy",
+          "position": {
+            "x": 16,
+            "y": 16
+          }
+        },
+        {
+          "id": 2,
+          "name": "Crate game_boy",
+          "position": {
+            "x": 32,
+            "y": 16
+          }
+        }
+      ],
+      "entity_components": {
+        "1": null,
+        "2": null
+      },
+      "playtest": {
+        "frame": 7
+      }
+    }
+  }
+]

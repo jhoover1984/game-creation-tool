@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GCS HTML5 Export Artifact</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background: #1b1f27;
+        color: #e6ecf5;
+        display: grid;
+        min-height: 100vh;
+        place-items: center;
+      }
+      .wrap {
+        display: grid;
+        gap: 12px;
+        align-items: start;
+      }
+      canvas {
+        border: 1px solid #3b4454;
+        image-rendering: pixelated;
+        background: #9bbc0f;
+      }
+      .note {
+        color: #aeb8c7;
+        font-size: 0.9rem;
+        max-width: 52ch;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>Mode: Release</div>
+      <div>Profile: game_boy</div>
+      <div id="export-scene-name">Scene: loading</div>
+      <canvas id="export-viewport" width="160" height="144"></canvas>
+      <div class="note">
+        Preview artifact (current build): pixel-exact export parity scene. Full authored gameplay
+        runtime export is tracked separately.
+      </div>
+      <div class="note">Controls: Arrow keys or WASD move the primary entity in this preview.</div>
+    </div>
+    <script src="./runtime.js"></script>
+  </body>
+</html>

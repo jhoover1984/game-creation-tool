@@ -1,0 +1,26 @@
+[package]
+name = "gcs-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+tauri-runtime = ["dep:tauri", "dep:tauri-build"]
+
+[dependencies]
+anyhow.workspace = true
+once_cell.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", optional = true , features = [] }
+command-core = { path = "../../../crates/command-core" }
+project-core = { path = "../../../crates/project-core" }
+engine-core = { path = "../../../crates/engine-core" }
+export-core = { path = "../../../crates/export-core" }
+script-core = { path = "../../../crates/script-core" }
+
+[build-dependencies]
+tauri-build = { version = "2", optional = true , features = [] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,15 @@
+[package]
+name = "gcs-wasm"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+engine-core = { path = "../engine-core" }
+command-core = { path = "../command-core" }
+script-core = { path = "../script-core" }

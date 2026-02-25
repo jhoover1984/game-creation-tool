@@ -1,0 +1,34 @@
+/* =====================================================================
+   ACCESSIBILITY -- reduced-motion, focus interaction states, disabled normalization
+   UI-VISUAL-001 (baseline), UI-VISUAL-002 (extracted from app.html)
+   UI-VISUAL-004 (normalization: expanded focus-visible coverage + :disabled centralization)
+   ===================================================================== */
+
+/* Reduced motion -- collapse all transitions/animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration:  0.01ms !important;
+  }
+}
+
+/* Focus ring -- all interactive controls and focusable elements (UI-VISUAL-004 expanded) */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Disabled normalization -- centralized opacity + cursor (UI-VISUAL-004) */
+button:disabled,
+button[disabled],
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}

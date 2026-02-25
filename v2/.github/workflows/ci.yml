@@ -1,0 +1,128 @@
+name: v2 CI
+
+on:
+  push:
+    paths:
+      - 'v2/**'
+  pull_request:
+    paths:
+      - 'v2/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  pr-template-check:
+    name: PR template governance
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require doc-governance sections in PR body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          BODY_FILE="$(mktemp)"
+          printf '%s\n' "${PR_BODY:-}" > "$BODY_FILE"
+
+          if ! grep -qiE '^##[[:space:]]+Doc References' "$BODY_FILE"; then
+            echo "PR body must include a '## Doc References' section."
+            exit 1
+          fi
+
+          if ! grep -qiE '^##[[:space:]]+Change-of-Plan Log' "$BODY_FILE"; then
+            echo "PR body must include a '## Change-of-Plan Log' section."
+            exit 1
+          fi
+
+          echo "PR template governance checks passed."
+
+  rust:
+    name: Rust (check + test + clippy)
+    runs-on: ubuntu-latest
+    needs: [pr-template-check]
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: v2
+      - run: cargo check --workspace
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace -- -D warnings
+
+  typescript:
+    name: TypeScript (typecheck + lint + test)
+    runs-on: ubuntu-latest
+    needs: [pr-template-check]
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test --if-present
+
+  contracts-check:
+    name: Contract integrity
+    runs-on: ubuntu-latest
+    needs: [rust, typescript]
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce contract docs/tests updates
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
+          fi
+          HEAD="${{ github.sha }}"
+
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD")"
+          echo "$CHANGED"
+
+          CONTRACTS_CHANGED="$(echo "$CHANGED" | grep -E '^packages/contracts/(src/.*\.ts|schema/.*\.json)$' || true)"
+          if [ -z "$CONTRACTS_CHANGED" ]; then
+            echo "No contract/schema changes detected."
+            exit 0
+          fi
+
+          DOCS_CHANGED="$(echo "$CHANGED" | grep -E '^docs/|^AGENT_GUIDE\.md$|^docs/roadmap/' || true)"
+          TESTS_CHANGED="$(echo "$CHANGED" | grep -E '\.test\.ts$|\.test\.mjs$' || true)"
+          SCHEMA_CHANGED="$(echo "$CHANGED" | grep -E '^packages/contracts/schema/.*\.json$' || true)"
+          FIXTURES_CHANGED="$(echo "$CHANGED" | grep -E '^packages/contracts/fixtures/.*\.json$' || true)"
+
+          if [ -z "$DOCS_CHANGED" ]; then
+            echo "Contract changes require docs updates (docs/ or AGENT_GUIDE.md)."
+            exit 1
+          fi
+
+          if [ -z "$TESTS_CHANGED" ]; then
+            echo "Contract changes require test updates (*.test.ts or *.test.mjs)."
+            exit 1
+          fi
+
+          if [ -n "$SCHEMA_CHANGED" ] && [ -z "$FIXTURES_CHANGED" ]; then
+            echo "Schema changes require fixture updates (packages/contracts/fixtures/*.json)."
+            exit 1
+          fi
+
+          echo "Contract integrity checks passed."

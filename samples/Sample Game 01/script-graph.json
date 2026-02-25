@@ -1,0 +1,86 @@
+{
+  "nodes": [
+    {
+      "id": "event_move_input",
+      "kind": "event"
+    },
+    {
+      "id": "flow_branch_walkable",
+      "kind": "flow"
+    },
+    {
+      "id": "cond_next_tile_walkable",
+      "kind": "condition"
+    },
+    {
+      "id": "cond_next_tile_has_crate",
+      "kind": "condition"
+    },
+    {
+      "id": "cond_crate_target_free",
+      "kind": "condition"
+    },
+    {
+      "id": "action_push_crate",
+      "kind": "action"
+    },
+    {
+      "id": "action_move_player",
+      "kind": "action"
+    },
+    {
+      "id": "action_check_goals",
+      "kind": "action"
+    },
+    {
+      "id": "cond_all_crates_on_goal",
+      "kind": "condition"
+    },
+    {
+      "id": "action_level_complete",
+      "kind": "action"
+    }
+  ],
+  "edges": [
+    {
+      "from": "event_move_input",
+      "to": "flow_branch_walkable"
+    },
+    {
+      "from": "flow_branch_walkable",
+      "to": "cond_next_tile_walkable"
+    },
+    {
+      "from": "cond_next_tile_walkable",
+      "to": "action_move_player"
+    },
+    {
+      "from": "flow_branch_walkable",
+      "to": "cond_next_tile_has_crate"
+    },
+    {
+      "from": "cond_next_tile_has_crate",
+      "to": "cond_crate_target_free"
+    },
+    {
+      "from": "cond_crate_target_free",
+      "to": "action_push_crate"
+    },
+    {
+      "from": "action_push_crate",
+      "to": "action_move_player"
+    },
+    {
+      "from": "action_move_player",
+      "to": "action_check_goals"
+    },
+    {
+      "from": "action_check_goals",
+      "to": "cond_all_crates_on_goal"
+    },
+    {
+      "from": "cond_all_crates_on_goal",
+      "to": "action_level_complete"
+    }
+  ]
+}

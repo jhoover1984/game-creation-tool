@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "2.0.0",
+  "mapId": "map_start",
+  "name": "Start Map",
+  "grid": {
+    "tileSize": { "x": 16, "y": 16 },
+    "chunkSizeTiles": { "x": 16, "y": 16 },
+    "origin": { "x": 0, "y": 0, "z": 0 }
+  },
+  "layers": [],
+  "entities": [],
+  "chunks": [
+    {
+      "chunkId": "chunk_start_0_0",
+      "coord": { "cx": 0, "cy": 0 },
+      "path": "maps/chunks/start_0_0.chunk.json",
+      "hash": "0123456789abcdef"
+    }
+  ]
+}

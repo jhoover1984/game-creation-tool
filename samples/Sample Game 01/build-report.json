@@ -1,0 +1,17 @@
+{
+  "sample_name": "Sample Game 01",
+  "profile": "game_boy",
+  "runtime_mode": "web",
+  "entity_count": 4,
+  "tile_count": 22,
+  "breakpoint_hit": {
+    "seq": 3,
+    "frame": 125,
+    "kind": "breakpoint:item_pickup",
+    "message": "Paused on item_pickup"
+  },
+  "audio_clip_count": 3,
+  "audio_binding_count": 3,
+  "export_command": "cargo run -p gcs-desktop --bin gcs-desktop -- invoke export_preview_html5 {\"outputDir\":\"C:\\\\Users\\\\cresc\\\\Desktop\\\\Projects\\\\Game Creation Tool\\\\samples\\\\Sample Game 01\\\\export-preview\",\"projectDir\":\"C:\\\\Users\\\\cresc\\\\Desktop\\\\Projects\\\\Game Creation Tool\\\\samples\\\\Sample Game 01\",\"profile\":\"game_boy\",\"debug\":false,\"editorState\":{\"entities\":[{\"id\":1,\"name\":\"Player\",\"position\":{\"x\":16,\"y\":16}},{\"id\":2,\"name\":\"Crate Prop (GB)\",\"position\":{\"x\":80,\"y\":32}},{\"id\":3,\"name\":\"Crate Prop (GB)\",\"position\":{\"x\":128,\"y\":48}},{\"id\":4,\"name\":\"Rock Prop (GB)\",\"position\":{\"x\":112,\"y\":80}}],\"tiles\":[{\"x\":2,\"y\":2,\"tile_id\":1},{\"x\":3,\"y\":2,\"tile_id\":1},{\"x\":4,\"y\":2,\"tile_id\":1},{\"x\":2,\"y\":3,\"tile_id\":1},{\"x\":4,\"y\":3,\"tile_id\":1},{\"x\":2,\"y\":4,\"tile_id\":1},{\"x\":3,\"y\":4,\"tile_id\":1},{\"x\":4,\"y\":4,\"tile_id\":1},{\"x\":5,\"y\":2,\"tile_id\":1},{\"x\":6,\"y\":2,\"tile_id\":1},{\"x\":5,\"y\":3,\"tile_id\":1},{\"x\":6,\"y\":3,\"tile_id\":1},{\"x\":8,\"y\":3,\"tile_id\":1},{\"x\":9,\"y\":3,\"tile_id\":1},{\"x\":8,\"y\":4,\"tile_id\":1},{\"x\":9,\"y\":4,\"tile_id\":1},{\"x\":7,\"y\":5,\"tile_id\":1},{\"x\":8,\"y\":5,\"tile_id\":1},{\"x\":8,\"y\":6,\"tile_id\":1},{\"x\":10,\"y\":2,\"tile_id\":1},{\"x\":10,\"y\":3,\"tile_id\":1},{\"x\":10,\"y\":4,\"tile_id\":1}],\"audio\":[{\"id\":\"theme\",\"name\":\"Theme\",\"assetPath\":\"C:\\\\Users\\\\cresc\\\\Desktop\\\\Projects\\\\Game Creation Tool\\\\samples\\\\Sample Game 01\\\\assets\\\\audio\\\\theme.wav\"},{\"id\":\"step\",\"name\":\"Step\",\"assetPath\":\"C:\\\\Users\\\\cresc\\\\Desktop\\\\Projects\\\\Game Creation Tool\\\\samples\\\\Sample Game 01\\\\assets\\\\audio\\\\step.wav\"},{\"id\":\"pickup\",\"name\":\"Pickup\",\"assetPath\":\"C:\\\\Users\\\\cresc\\\\Desktop\\\\Projects\\\\Game Creation Tool\\\\samples\\\\Sample Game 01\\\\assets\\\\audio\\\\pickup.wav\"}],\"audioBindings\":{\"item_pickup\":\"pickup\",\"ui_open\":\"theme\"},\"audioEvents\":[{\"event\":\"battle_start\",\"audioId\":\"theme\"}],\"playtest\":{\"frame\":125}}}",
+  "export_stdout": "{\n  \"asset_count\": 7,\n  \"files\": [\n    \"index.html\",\n    \"runtime.js\",\n    \"scenes.json\",\n    \"metadata.json\",\n    \"bundle.json\",\n    \"assets/manifest.json\"\n  ],\n  \"mode\": \"release\",\n  \"output_dir\": \"C:\\\\Users\\\\cresc\\\\Desktop\\\\Projects\\\\Game Creation Tool\\\\samples\\\\Sample Game 01\\\\export-preview\",\n  \"profile\": \"game_boy\",\n  \"scene_count\": 1\n}"
+}

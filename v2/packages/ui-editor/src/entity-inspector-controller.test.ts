@@ -1,0 +1,269 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { EntityInspectorController } from './entity-inspector-controller.js';
+import type { InspectorAppAdapter } from './entity-inspector-controller.js';
+import type { EntityDef } from '@gcs/contracts';
+
+function makeEntity(overrides: Partial<EntityDef> = {}): EntityDef {
+  return {
+    id: 'ent-1',
+    name: 'Hero',
+    position: { x: 10, y: 20 },
+    size: { w: 16, h: 16 },
+    solid: false,
+    tags: [],
+    ...overrides,
+  };
+}
+
+/**
+ * Minimal DOM container mock.
+ * `fields` maps data-path strings to { value?, checked? }.
+ */
+function makeContainer(fields: Record<string, { value?: string; checked?: boolean }>) {
+  let clickListener: ((event: Event) => void) | null = null;
+
+  const container = {
+    innerHTML: '',
+    addEventListener(_type: string, fn: (event: Event) => void) {
+      clickListener = fn;
+    },
+    removeEventListener(_type: string, _fn: (event: Event) => void) {
+      clickListener = null;
+    },
+    querySelector(selector: string) {
+      const match = selector.match(/data-path="([^"]+)"/);
+      if (!match) return null;
+      const path = match[1];
+      const field = fields[path];
+      if (!field) return null;
+      return { value: field.value ?? '', checked: field.checked ?? false };
+    },
+    /** Simulate clicking the Apply button (target with the action attribute). */
+    fireApply() {
+      if (!clickListener) return;
+      const target = {
+        getAttribute(attr: string) {
+          return attr === 'data-action' ? 'apply-entity-inspector' : null;
+        },
+      };
+      clickListener({ target } as unknown as Event);
+    },
+    /** Simulate clicking an element that does NOT have the action attribute. */
+    fireOther() {
+      if (!clickListener) return;
+      const target = {
+        getAttribute(_attr: string) {
+          return null;
+        },
+      };
+      clickListener({ target } as unknown as Event);
+    },
+  };
+
+  return container as unknown as HTMLElement & {
+    fireApply(): void;
+    fireOther(): void;
+  };
+}
+
+function makeApp(entity: EntityDef | null = null): InspectorAppAdapter & {
+  renameCalls: Array<{ entityId: string; name: string }>;
+  moveCalls: Array<{ entityId: string; x: number; y: number }>;
+  speedCalls: Array<{ entityId: string; speed: number }>;
+} {
+  const renameCalls: Array<{ entityId: string; name: string }> = [];
+  const moveCalls: Array<{ entityId: string; x: number; y: number }> = [];
+  const speedCalls: Array<{ entityId: string; speed: number }> = [];
+
+  return {
+    renameCalls,
+    moveCalls,
+    speedCalls,
+    getSelectedEntity() {
+      return entity;
+    },
+    moveEntity(entityId, x, y) {
+      moveCalls.push({ entityId, x, y });
+    },
+    renameEntity(entityId, name) {
+      renameCalls.push({ entityId, name });
+    },
+    updateEntityVisual(_entityId, _visual) {
+      return true;
+    },
+    setEntitySpeed(entityId, speed) {
+      speedCalls.push({ entityId, speed });
+      return true;
+    },
+  };
+}
+
+test('EntityInspectorController: Apply dispatches renameEntity when name changed', () => {
+  const entity = makeEntity({ name: 'Hero' });
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: 'Villain' },
+    'position.x': { value: '10' },
+    'position.y': { value: '20' },
+    solid: { checked: false },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+  });
+
+  new EntityInspectorController(app, container);
+  container.fireApply();
+
+  assert.equal(app.renameCalls.length, 1, 'renameEntity should have been called once');
+  assert.equal(app.renameCalls[0].entityId, 'ent-1');
+  assert.equal(app.renameCalls[0].name, 'Villain');
+});
+
+test('EntityInspectorController: Apply does NOT call renameEntity when name is unchanged', () => {
+  const entity = makeEntity({ name: 'Hero' });
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: 'Hero' },
+    'position.x': { value: '10' },
+    'position.y': { value: '20' },
+    solid: { checked: false },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+  });
+
+  new EntityInspectorController(app, container);
+  container.fireApply();
+
+  assert.equal(app.renameCalls.length, 0, 'renameEntity should not be called when name is unchanged');
+});
+
+test('EntityInspectorController: Apply does NOT call renameEntity when name is empty', () => {
+  const entity = makeEntity({ name: 'Hero' });
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: '' },
+    'position.x': { value: '10' },
+    'position.y': { value: '20' },
+    solid: { checked: false },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+  });
+
+  new EntityInspectorController(app, container);
+  container.fireApply();
+
+  assert.equal(app.renameCalls.length, 0, 'renameEntity should not be called when name is empty');
+});
+
+test('EntityInspectorController: click on non-Apply element does nothing', () => {
+  const entity = makeEntity();
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: 'X' },
+    'position.x': { value: '0' },
+    'position.y': { value: '0' },
+    solid: { checked: false },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+  });
+
+  new EntityInspectorController(app, container);
+  container.fireOther();
+
+  assert.equal(app.renameCalls.length, 0);
+  assert.equal(app.moveCalls.length, 0);
+});
+
+test('EntityInspectorController: dispose removes click listener', () => {
+  const entity = makeEntity();
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: 'Different' },
+    'position.x': { value: '0' },
+    'position.y': { value: '0' },
+    solid: { checked: false },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+  });
+
+  const ctrl = new EntityInspectorController(app, container);
+  ctrl.dispose();
+  container.fireApply();
+
+  assert.equal(app.renameCalls.length, 0, 'no calls after dispose');
+});
+
+test('EntityInspectorController: player entity renders Player Config section with default speed 120', () => {
+  const entity = makeEntity({ tags: ['player'] });
+  const app = makeApp(entity);
+  const container = makeContainer({});
+
+  new EntityInspectorController(app, container);
+
+  const html = (container as unknown as { innerHTML: string }).innerHTML;
+  assert.ok(html.includes('Player Config'), 'should render Player Config section');
+  assert.ok(html.includes('data-path="speed"'), 'should render speed input');
+  assert.ok(html.includes('value="120"'), 'should default speed to 120');
+});
+
+test('EntityInspectorController: player entity with explicit speed renders that value', () => {
+  const entity = makeEntity({ tags: ['player'], speed: 200 });
+  const app = makeApp(entity);
+  const container = makeContainer({});
+
+  new EntityInspectorController(app, container);
+
+  const html = (container as unknown as { innerHTML: string }).innerHTML;
+  assert.ok(html.includes('value="200"'), 'should show persisted speed value');
+});
+
+test('EntityInspectorController: non-player entity does not render Player Config section', () => {
+  const entity = makeEntity({ tags: [] });
+  const app = makeApp(entity);
+  const container = makeContainer({});
+
+  new EntityInspectorController(app, container);
+
+  const html = (container as unknown as { innerHTML: string }).innerHTML;
+  assert.ok(!html.includes('Player Config'), 'should not render Player Config for non-player');
+  assert.ok(!html.includes('data-path="speed"'), 'should not render speed input for non-player');
+});
+
+test('EntityInspectorController: Apply on player entity calls setEntitySpeed with parsed value', () => {
+  const entity = makeEntity({ tags: ['player'] });
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: 'Player' },
+    'position.x': { value: '0' },
+    'position.y': { value: '0' },
+    solid: { checked: true },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+    speed: { value: '240' },
+  });
+
+  new EntityInspectorController(app, container);
+  container.fireApply();
+
+  assert.equal(app.speedCalls.length, 1, 'setEntitySpeed should be called once');
+  assert.equal(app.speedCalls[0].entityId, 'ent-1');
+  assert.equal(app.speedCalls[0].speed, 240);
+});
+
+test('EntityInspectorController: Apply on non-player entity does not call setEntitySpeed', () => {
+  const entity = makeEntity({ tags: [] });
+  const app = makeApp(entity);
+  const container = makeContainer({
+    name: { value: 'Wall' },
+    'position.x': { value: '0' },
+    'position.y': { value: '0' },
+    solid: { checked: true },
+    spriteId: { value: '' },
+    animationClipId: { value: '' },
+  });
+
+  new EntityInspectorController(app, container);
+  container.fireApply();
+
+  assert.equal(app.speedCalls.length, 0, 'setEntitySpeed should not be called for non-player');
+});

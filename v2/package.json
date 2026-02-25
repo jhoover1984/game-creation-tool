@@ -1,0 +1,29 @@
+{
+  "name": "gcs-v2",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/contracts",
+    "packages/runtime-web",
+    "packages/ui-editor"
+  ],
+  "scripts": {
+    "dev": "npm run build && npm run serve:editor",
+    "build": "npm run build --workspaces",
+    "lint": "eslint \"packages/*/src/**/*.ts\"",
+    "typecheck": "tsc --build",
+    "test": "npm run test --workspaces --if-present",
+    "status": "node scripts/status.mjs",
+    "serve:editor": "node scripts/serve-packages.mjs",
+    "check:ascii": "node scripts/check-ascii.mjs",
+    "build:wasm": "wasm-pack build packages/core/simulation --target web --out-dir ../../runtime-web/src/wasm",
+    "ci": "npm run typecheck && npm run lint && npm run test && npm run check:ascii"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
+    "eslint": "^9",
+    "typescript": "^5.7"
+  }
+}

@@ -1,0 +1,167 @@
+[
+  {
+    "name": "authored_map_preview",
+    "options": {
+      "width": 160,
+      "height": 144,
+      "tilePx": 8
+    },
+    "snapshot": {
+      "tiles": [
+        {
+          "x": 2,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 3,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 4,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 2,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 4,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 2,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 3,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 4,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 6,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 6,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 8,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 9,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 8,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 9,
+          "y": 4,
+          "tile_id": 1
+        },
+        {
+          "x": 7,
+          "y": 5,
+          "tile_id": 1
+        },
+        {
+          "x": 8,
+          "y": 5,
+          "tile_id": 1
+        },
+        {
+          "x": 8,
+          "y": 6,
+          "tile_id": 1
+        },
+        {
+          "x": 10,
+          "y": 2,
+          "tile_id": 1
+        },
+        {
+          "x": 10,
+          "y": 3,
+          "tile_id": 1
+        },
+        {
+          "x": 10,
+          "y": 4,
+          "tile_id": 1
+        }
+      ],
+      "entities": [
+        {
+          "id": 1,
+          "name": "Player",
+          "position": {
+            "x": 16,
+            "y": 16
+          }
+        },
+        {
+          "id": 2,
+          "name": "Crate Prop (GB)",
+          "position": {
+            "x": 80,
+            "y": 32
+          }
+        },
+        {
+          "id": 3,
+          "name": "Crate Prop (GB)",
+          "position": {
+            "x": 128,
+            "y": 48
+          }
+        },
+        {
+          "id": 4,
+          "name": "Rock Prop (GB)",
+          "position": {
+            "x": 112,
+            "y": 80
+          }
+        }
+      ],
+      "entity_components": {
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null
+      },
+      "playtest": {
+        "frame": 125
+      }
+    }
+  }
+]

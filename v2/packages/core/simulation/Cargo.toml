@@ -1,0 +1,18 @@
+[package]
+name = "gcs-simulation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gcs-math = { path = "../math" }
+gcs-collision = { path = "../collision" }
+gcs-physics = { path = "../physics" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }

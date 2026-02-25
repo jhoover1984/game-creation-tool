@@ -1,0 +1,29 @@
+{
+  "entityId": "ent_player",
+  "name": "Player",
+  "tags": ["player"],
+  "transform": {
+    "position": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "scale": { "x": 1, "y": 1, "z": 1 }
+  },
+  "components": [
+    {
+      "type": "SpriteRenderer",
+      "sprite": { "assetId": "asset_player_sheet", "subId": "idle_0" }
+    },
+    {
+      "type": "Animator",
+      "controller": { "assetId": "asset_player_anim_ctrl" },
+      "playOnStart": "idle"
+    },
+    {
+      "type": "Collider2D",
+      "layer": "player",
+      "shape": {
+        "kind": "box",
+        "halfExtents": { "x": 8, "y": 8 }
+      }
+    }
+  ]
+}

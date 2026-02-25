@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Game Creator Studio",
+  "version": "0.1.0",
+  "identifier": "com.gamecreator.studio",
+  "build": {
+    "frontendDist": "../src/"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Game Creator Studio",
+        "width": 1280,
+        "height": 800,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.png"]
+  }
+}
