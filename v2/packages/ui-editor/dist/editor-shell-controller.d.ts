@@ -123,6 +123,10 @@ export declare class EditorShellController {
     private readonly onContextMenuHandler;
     private readonly playtest;
     private pendingInteract;
+    private loopId;
+    private lastPlaySnap;
+    private resizeObserver;
+    private fitPendingId;
     private readonly consoleLines;
     private isPainting;
     private lastPaintCell;
@@ -148,6 +152,10 @@ export declare class EditorShellController {
     /** Switch layout density independently of onboarding mode (UI-VISUAL-002 Slice B). */
     setDensity(density: 'comfort' | 'dense'): void;
     dispose(): void;
+    /** Start the rAF-based playtest run loop. No-op if already running. D-005a. */
+    private startPlayLoop;
+    /** Stop the rAF-based playtest run loop. No-op if not running. D-005a. */
+    private stopPlayLoop;
     private stepPlaytest;
     private writeConsole;
     /**
@@ -190,6 +198,7 @@ export declare class EditorShellController {
     /**
      * Fit the viewport so the entire map is visible and centered.
      * Falls back to canvas intrinsic size if the container has no layout yet. UI-VIEWPORT-001.
+     * FRAMING_MARGIN_PX prevents right/bottom edge clip under overflow:hidden. D-002.
      */
     private fitViewportToMap;
 }

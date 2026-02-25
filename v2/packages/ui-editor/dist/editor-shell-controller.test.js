@@ -662,4 +662,229 @@ test('UI-SHELL-POLISH-001 A4/A5: fitViewportToMap recalculates correctly after r
     assert.ok(scaledHeight2 <= container.clientHeight + 0.5, `after resize, scaled height ${scaledHeight2.toFixed(2)} must not exceed new container height ${container.clientHeight}`);
     controller.dispose();
 });
+test('D-002: fitViewportToMap applies FRAMING_MARGIN_PX -- scaled map is strictly smaller than container on both axes', () => {
+    // Container sized to match the default 1024x576 map exactly.
+    // Without a margin, zoom=1 and scaled dimensions = container; clip would occur.
+    // With FRAMING_MARGIN_PX=4, scaled dimensions must be strictly < container on both axes.
+    const container = { clientWidth: 1024, clientHeight: 576 };
+    const canvas = makeFramingCanvas(container);
+    const tasksContainer = new FakeContainer();
+    const inspectorContainer = new FakeContainer();
+    const consoleContainer = new FakeContainer();
+    const status = { textContent: '' };
+    const controller = new EditorShellController({ canvas, tasksContainer, inspectorContainer, consoleContainer, status });
+    controller.fitViewportToMap();
+    const t = parseTransform(canvas.style.transform);
+    assert.ok(t !== null, 'canvas must have a CSS transform');
+    const mapWidth = controller.app.store.manifest.resolution.width;
+    const mapHeight = controller.app.store.manifest.resolution.height;
+    const scaledWidth = mapWidth * t.zoom;
+    const scaledHeight = mapHeight * t.zoom;
+    assert.ok(scaledWidth < container.clientWidth, `D-002: scaled width ${scaledWidth.toFixed(2)} must be strictly < container width ${container.clientWidth}`);
+    assert.ok(scaledHeight < container.clientHeight, `D-002: scaled height ${scaledHeight.toFixed(2)} must be strictly < container height ${container.clientHeight}`);
+    controller.dispose();
+});
+// --- D-005a: Playtest run loop tests ---
+// rAF is mocked per-test and restored in a finally block to prevent cross-test flake.
+function makeRafMock() {
+    const queue = [];
+    let id = 0;
+    const origRaf = globalThis.requestAnimationFrame;
+    const origCaf = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = ((cb) => {
+        queue.push(cb);
+        return ++id;
+    });
+    globalThis.cancelAnimationFrame = (() => {
+        queue.length = 0;
+    });
+    const flush = (n = 1) => { for (let i = 0; i < n; i++)
+        queue.shift()?.(0); };
+    const restore = () => {
+        globalThis.requestAnimationFrame = origRaf;
+        globalThis.cancelAnimationFrame = origCaf;
+    };
+    return { queue, flush, restore };
+}
+test('D-005a: run loop -- HUD shows tick > 0 after rAF frames', () => {
+    const raf = makeRafMock();
+    try {
+        const canvas = createMockCanvas();
+        const tasksContainer = new FakeContainer();
+        const inspectorContainer = new FakeContainer();
+        const consoleContainer = new FakeContainer();
+        const status = { textContent: '' };
+        const playtestHud = { textContent: '' };
+        const btnPlay = new FakeButton();
+        const controller = new EditorShellController({
+            canvas, tasksContainer, inspectorContainer, consoleContainer, status, playtestHud, btnPlay,
+        });
+        btnPlay.click();
+        raf.flush(3);
+        assert.match(playtestHud.textContent ?? '', /tick=\d+/, 'HUD must contain tick= after rAF frames');
+        const m = /tick=(\d+)/.exec(playtestHud.textContent ?? '');
+        assert.ok(m !== null && Number(m[1]) > 0, `tick should be > 0, got: ${playtestHud.textContent}`);
+        controller.dispose();
+    }
+    finally {
+        raf.restore();
+    }
+});
+test('D-005a: run loop -- HUD shows player=( substring when player entity present', () => {
+    const oldLocalStorage = globalThis.localStorage;
+    const project = JSON.stringify({
+        manifest: {
+            id: 'proj_loop_player',
+            name: 'Loop Player',
+            version: '0.1.0',
+            resolution: { width: 320, height: 240 },
+            tileSize: 16,
+            createdAt: 'now',
+            updatedAt: 'now',
+        },
+        tileLayers: [{
+                id: 'layer-0', name: 'Ground', width: 20, height: 15, tileSize: 16,
+                data: new Array(20 * 15).fill(0),
+            }],
+        entities: [
+            { id: 'player_loop', name: 'Player', position: { x: 16, y: 16 }, size: { w: 16, h: 16 }, solid: true, tags: ['player'] },
+        ],
+    });
+    const fakeStore = new FakeStorage();
+    fakeStore.setItem('gcs-v2-project', project);
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: fakeStore });
+    const raf = makeRafMock();
+    try {
+        const canvas = createMockCanvas();
+        const tasksContainer = new FakeContainer();
+        const inspectorContainer = new FakeContainer();
+        const consoleContainer = new FakeContainer();
+        const status = { textContent: '' };
+        const playtestHud = { textContent: '' };
+        const btnLoad = new FakeButton();
+        const btnPlay = new FakeButton();
+        const controller = new EditorShellController({
+            canvas, tasksContainer, inspectorContainer, consoleContainer, status, playtestHud, btnLoad, btnPlay,
+        });
+        btnLoad.click();
+        btnPlay.click();
+        raf.flush(3);
+        assert.ok((playtestHud.textContent ?? '').includes('player=('), `HUD must contain player=( when player entity present, got: "${playtestHud.textContent}"`);
+        controller.dispose();
+    }
+    finally {
+        raf.restore();
+        Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: oldLocalStorage });
+    }
+});
+test('D-005a: run loop -- Pause stops the loop; HUD retains last tick', () => {
+    const raf = makeRafMock();
+    try {
+        const canvas = createMockCanvas();
+        const tasksContainer = new FakeContainer();
+        const inspectorContainer = new FakeContainer();
+        const consoleContainer = new FakeContainer();
+        const status = { textContent: '' };
+        const playtestHud = { textContent: '' };
+        const btnPlay = new FakeButton();
+        const btnPause = new FakeButton();
+        const controller = new EditorShellController({
+            canvas, tasksContainer, inspectorContainer, consoleContainer, status, playtestHud, btnPlay, btnPause,
+        });
+        btnPlay.click();
+        raf.flush(5);
+        const hudAfterPlay = playtestHud.textContent ?? '';
+        assert.match(hudAfterPlay, /tick=\d+/, 'HUD must show tick after 5 rAF frames');
+        const queueLengthBeforePause = raf.queue.length;
+        btnPause.click();
+        // After pause the loop should be cancelled; no further rAF callbacks should be queued.
+        assert.ok(raf.queue.length <= queueLengthBeforePause, 'rAF queue must not grow after Pause');
+        // HUD must still show a tick= value (not reset to plain state string).
+        assert.match(playtestHud.textContent ?? '', /tick=\d+/, 'HUD must retain tick= after Pause');
+        controller.dispose();
+    }
+    finally {
+        raf.restore();
+    }
+});
+test('D-005a: Step from paused state increments HUD tick by 1', () => {
+    const raf = makeRafMock();
+    try {
+        const canvas = createMockCanvas();
+        const tasksContainer = new FakeContainer();
+        const inspectorContainer = new FakeContainer();
+        const consoleContainer = new FakeContainer();
+        const status = { textContent: '' };
+        const playtestHud = { textContent: '' };
+        const btnPlay = new FakeButton();
+        const btnPause = new FakeButton();
+        const btnStep = new FakeButton();
+        const controller = new EditorShellController({
+            canvas, tasksContainer, inspectorContainer, consoleContainer, status, playtestHud,
+            btnPlay, btnPause, btnStep,
+        });
+        btnPlay.click();
+        raf.flush(3);
+        btnPause.click();
+        const mBefore = /tick=(\d+)/.exec(playtestHud.textContent ?? '');
+        assert.ok(mBefore !== null, 'HUD must show tick before Step');
+        const tickBefore = Number(mBefore[1]);
+        btnStep.click();
+        const mAfter = /tick=(\d+)/.exec(playtestHud.textContent ?? '');
+        assert.ok(mAfter !== null, 'HUD must show tick after Step');
+        const tickAfter = Number(mAfter[1]);
+        assert.equal(tickAfter, tickBefore + 1, `tick should increment by 1 from ${tickBefore} to ${tickBefore + 1}`);
+        controller.dispose();
+    }
+    finally {
+        raf.restore();
+    }
+});
+// --- D-002: ResizeObserver re-fit tests ---
+// Verifies that container resize events trigger a debounced fitViewportToMap() call.
+// ResizeObserver is mocked since Node.js test environment does not provide it.
+test('D-002: ResizeObserver re-fits viewport on container resize -- no-clip invariant holds after resize', () => {
+    // Use a plain callback type -- ResizeObserverEntry is a DOM type not in the Node.js test lib.
+    let capturedCb = null;
+    const origResizeObserver = globalThis['ResizeObserver'];
+    class MockResizeObserver {
+        constructor(cb) { capturedCb = cb; }
+        observe(_target) { }
+        disconnect() { }
+    }
+    globalThis['ResizeObserver'] = MockResizeObserver;
+    const raf = makeRafMock();
+    try {
+        const container = { clientWidth: 1200, clientHeight: 700 };
+        const canvas = makeFramingCanvas(container);
+        const tasksContainer = new FakeContainer();
+        const inspectorContainer = new FakeContainer();
+        const consoleContainer = new FakeContainer();
+        const status = { textContent: '' };
+        const controller = new EditorShellController({ canvas, tasksContainer, inspectorContainer, consoleContainer, status });
+        assert.ok(capturedCb !== null, 'ResizeObserver callback should have been registered');
+        // Drain startup double-rAF so baseline transform is set
+        raf.flush(2);
+        const t1 = parseTransform(canvas.style.transform);
+        assert.ok(t1 !== null, 'canvas must have a transform after startup fit');
+        // Shrink the container and fire the observer callback
+        container.clientWidth = 500;
+        container.clientHeight = 400;
+        capturedCb();
+        // Flush the debounce rAF queued by the observer callback
+        raf.flush(1);
+        const t2 = parseTransform(canvas.style.transform);
+        assert.ok(t2 !== null, 'canvas must have a transform after resize fit');
+        const mapWidth = controller.app.store.manifest.resolution.width;
+        const mapHeight = controller.app.store.manifest.resolution.height;
+        assert.ok(mapWidth * t2.zoom < container.clientWidth, `after resize, scaled width ${(mapWidth * t2.zoom).toFixed(2)} must be < container width ${container.clientWidth}`);
+        assert.ok(mapHeight * t2.zoom < container.clientHeight, `after resize, scaled height ${(mapHeight * t2.zoom).toFixed(2)} must be < container height ${container.clientHeight}`);
+        assert.ok(t2.zoom < t1.zoom, 'zoom should decrease when container shrinks');
+        controller.dispose();
+    }
+    finally {
+        globalThis['ResizeObserver'] = origResizeObserver;
+        raf.restore();
+    }
+});
 //# sourceMappingURL=editor-shell-controller.test.js.map

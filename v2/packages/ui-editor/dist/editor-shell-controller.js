@@ -48,6 +48,10 @@ export class EditorShellController {
     onContextMenuHandler;
     playtest = new PlaytestRunner();
     pendingInteract = false;
+    loopId = null;
+    lastPlaySnap = null;
+    resizeObserver = null;
+    fitPendingId = null;
     consoleLines = [];
     isPainting = false;
     lastPaintCell = null;
@@ -337,8 +341,10 @@ export class EditorShellController {
             this.updateProjectStatus();
             this.inspectorController.refresh();
             this.storyController?.refresh();
+            this.stopPlayLoop(); // D-005a: halt run loop before exit
             this.playtest.exit();
             this.playtest.clearTrace();
+            this.lastPlaySnap = null;
             this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ROW_CAP_EXCEEDED', '');
             this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ACTION_CAP_EXCEEDED', '');
             this.effectsController?.setPlaytestTick(0);
@@ -372,7 +378,9 @@ export class EditorShellController {
             this.inspectorController.refresh();
             this.storyController?.refresh();
             this.effectsController?.refresh();
+            this.stopPlayLoop(); // D-005a: halt run loop before exit
             this.playtest.exit();
+            this.lastPlaySnap = null;
             this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ROW_CAP_EXCEEDED', '');
             this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ACTION_CAP_EXCEEDED', '');
             this.effectsController?.setPlaytestTick(0);
@@ -503,8 +511,10 @@ export class EditorShellController {
             elements.status.textContent = `Loaded: ${this.app.store.manifest.name}`;
             this.inspectorController.refresh();
             this.storyController?.refresh();
+            this.stopPlayLoop(); // D-005a: halt run loop before exit
             this.playtest.exit();
             this.playtest.clearTrace();
+            this.lastPlaySnap = null;
             this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ROW_CAP_EXCEEDED', '');
             this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ACTION_CAP_EXCEEDED', '');
             this.effectsController?.setPlaytestTick(0);
@@ -540,18 +550,21 @@ export class EditorShellController {
             this.checklistController?.notifyPlaytestEntered();
             this.behaviorController?.notifyPlaytestEntered();
             this.effectsController?.setPlaytestTick(0);
+            this.startPlayLoop(); // D-005a: begin continuous tick/HUD updates
         });
         elements.btnPause?.addEventListener('click', () => {
             const status = this.playtest.getStatus();
             if (status === 'running') {
+                this.stopPlayLoop(); // D-005a: halt the run loop before pausing
                 this.playtest.pause();
             }
             else if (status === 'paused') {
                 this.playtest.resume();
+                this.startPlayLoop(); // D-005a: restart the loop on resume
             }
             elements.status.textContent = `Playtest: ${this.playtest.getStatus()}`;
             this.writeConsole(`Playtest ${this.playtest.getStatus()}.`);
-            this.updatePlaytestHud(null);
+            this.updatePlaytestHud(this.lastPlaySnap); // show last known tick/position on pause
         });
         elements.btnInteract?.addEventListener('click', () => {
             this.pendingInteract = true;
@@ -571,12 +584,33 @@ export class EditorShellController {
         globalThis.requestAnimationFrame?.(() => {
             globalThis.requestAnimationFrame?.(() => this.fitViewportToMap());
         });
+        // Re-fit on every container resize so the canvas stays framed at any viewport size.
+        // ResizeObserver is absent in Node.js test environment -- guarded. CV-01/CV-05. D-002.
+        const stage = this.elements.canvas.parentElement;
+        if (stage && globalThis.ResizeObserver) {
+            this.resizeObserver = new globalThis.ResizeObserver(() => {
+                if (this.fitPendingId !== null) {
+                    globalThis.cancelAnimationFrame?.(this.fitPendingId);
+                }
+                this.fitPendingId = globalThis.requestAnimationFrame?.(() => {
+                    this.fitPendingId = null;
+                    this.fitViewportToMap();
+                }) ?? null;
+            });
+            this.resizeObserver.observe(stage);
+        }
     }
     /** Switch layout density independently of onboarding mode (UI-VISUAL-002 Slice B). */
     setDensity(density) {
         this.elements.shellRoot?.setAttribute('data-density', density);
     }
     dispose() {
+        this.resizeObserver?.disconnect();
+        this.resizeObserver = null;
+        if (this.fitPendingId !== null) {
+            globalThis.cancelAnimationFrame?.(this.fitPendingId);
+            this.fitPendingId = null;
+        }
         this.unsubscribeDiagnostics();
         this.unsubscribeBus();
         this.unsubscribeSpriteStore();
@@ -603,6 +637,34 @@ export class EditorShellController {
         this.animationController?.dispose();
         this.contextMenuController?.dispose();
         this.unsubscribeOnboardingStore();
+    }
+    /** Start the rAF-based playtest run loop. No-op if already running. D-005a. */
+    startPlayLoop() {
+        if (this.loopId !== null)
+            return;
+        const tick = (ts) => {
+            if (this.playtest.getStatus() !== 'running') {
+                this.loopId = null;
+                return;
+            }
+            this.playtest.setInput({ moveX: 0, moveY: 0, interact: this.pendingInteract });
+            this.pendingInteract = false;
+            const snap = this.playtest.step();
+            if (snap) {
+                this.lastPlaySnap = snap;
+                this.effectsController?.setPlaytestTick(snap.tick);
+                this.updatePlaytestHud(snap);
+            }
+            this.loopId = globalThis.requestAnimationFrame?.(tick) ?? null;
+        };
+        this.loopId = globalThis.requestAnimationFrame?.(tick) ?? null;
+    }
+    /** Stop the rAF-based playtest run loop. No-op if not running. D-005a. */
+    stopPlayLoop() {
+        if (this.loopId !== null) {
+            globalThis.cancelAnimationFrame?.(this.loopId);
+            this.loopId = null;
+        }
     }
     stepPlaytest() {
         const status = this.playtest.getStatus();
@@ -661,6 +723,9 @@ export class EditorShellController {
             this.playtest.pause();
         }
         this.elements.status.textContent = `Playtest: ${this.playtest.getStatus()}`;
+        if (snap) {
+            this.lastPlaySnap = snap;
+        } // D-005a: keep lastPlaySnap current
         this.updatePlaytestHud(snap);
     }
     writeConsole(line) {
@@ -889,12 +954,14 @@ export class EditorShellController {
     /**
      * Fit the viewport so the entire map is visible and centered.
      * Falls back to canvas intrinsic size if the container has no layout yet. UI-VIEWPORT-001.
+     * FRAMING_MARGIN_PX prevents right/bottom edge clip under overflow:hidden. D-002.
      */
     fitViewportToMap() {
+        const FRAMING_MARGIN_PX = 4;
         const container = this.elements.canvas.parentElement;
         const cw = (container?.clientWidth ?? 0) || this.elements.canvas.width;
         const ch = (container?.clientHeight ?? 0) || this.elements.canvas.height;
-        this.viewport.fitToMap(cw, ch, this.app.store.manifest.resolution.width, this.app.store.manifest.resolution.height);
+        this.viewport.fitToMap(cw, ch, this.app.store.manifest.resolution.width, this.app.store.manifest.resolution.height, FRAMING_MARGIN_PX);
         this.viewport.applyTransform(this.elements.canvas);
     }
 }
