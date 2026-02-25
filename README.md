@@ -43,3 +43,5 @@ Workspace scaffold initialized from `Design Doc Final v1.1.txt`.
 - Desktop browser E2E: `cd apps/desktop && npm run test:e2e`
 - Native preview export artifact build: `cd apps/desktop && npm run build:export:preview:native`
 - Native NES preview export artifact build: `cd apps/desktop && npm run build:export:preview:nes`
+
+CI bootstrap PR
