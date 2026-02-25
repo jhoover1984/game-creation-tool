@@ -72,7 +72,7 @@ canvas {
   flex-wrap: wrap;
 }
 .tab-btn {
-  flex: 1;
+  flex: 1 1 calc(33.33% - 1px);
   padding: var(--sp-2) var(--sp-1);
   background: transparent;
   border: none;
@@ -82,7 +82,7 @@ canvas {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
   transition: color var(--duration-fast), background var(--duration-fast);

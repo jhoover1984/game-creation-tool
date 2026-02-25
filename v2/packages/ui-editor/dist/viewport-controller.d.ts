@@ -61,8 +61,11 @@ export declare class ViewportController {
      * @param containerHeight Visible height of the canvas stage in CSS pixels.
      * @param mapWidth        Intrinsic map width in pixels (tiles * tileSize).
      * @param mapHeight       Intrinsic map height in pixels (tiles * tileSize).
+     * @param margin          Safety inset in CSS pixels applied to both sides of each axis
+     *                        before computing zoom. Prevents right/bottom edge clip under
+     *                        overflow:hidden. Default 0 (no inset). D-002 fix.
      */
-    fitToMap(containerWidth: number, containerHeight: number, mapWidth: number, mapHeight: number): void;
+    fitToMap(containerWidth: number, containerHeight: number, mapWidth: number, mapHeight: number, margin?: number): void;
     /**
      * Reset zoom to 100% and pan to origin.
      */

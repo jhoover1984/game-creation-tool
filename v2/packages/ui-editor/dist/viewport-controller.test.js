@@ -172,6 +172,35 @@ describe('UI-VIEWPORT-001: ViewportController', () => {
             assert.ok(vc.panX > 0, 'width headroom should produce positive panX for centering');
             assert.ok(Math.abs(vc.panY) < 0.001, 'height is exact fit, no vertical padding');
         });
+        it('D-002: margin param -- right edge stays within (containerWidth - margin*2)', () => {
+            const vc = new ViewportController();
+            const margin = 4;
+            vc.fitToMap(1420, 800, 1024, 576, margin);
+            const scaledWidth = 1024 * vc.zoom;
+            assert.ok(scaledWidth <= 1420 - margin * 2, `scaled map width ${scaledWidth.toFixed(2)} must be <= ${1420 - margin * 2}`);
+        });
+        it('D-002: margin param -- bottom edge stays within (containerHeight - margin*2)', () => {
+            const vc = new ViewportController();
+            const margin = 4;
+            vc.fitToMap(1420, 800, 1024, 576, margin);
+            const scaledHeight = 576 * vc.zoom;
+            assert.ok(scaledHeight <= 800 - margin * 2, `scaled map height ${scaledHeight.toFixed(2)} must be <= ${800 - margin * 2}`);
+        });
+        it('D-002: margin param -- panX >= margin so both sides get clearance', () => {
+            const vc = new ViewportController();
+            const margin = 4;
+            vc.fitToMap(1420, 800, 1024, 576, margin);
+            assert.ok(vc.panX >= margin, `panX ${vc.panX.toFixed(2)} should be >= margin ${margin}`);
+        });
+        it('D-002: margin=0 behaves identically to original call (regression guard)', () => {
+            const vcBase = new ViewportController();
+            const vcZero = new ViewportController();
+            vcBase.fitToMap(800, 600, 1024, 576);
+            vcZero.fitToMap(800, 600, 1024, 576, 0);
+            assert.ok(Math.abs(vcBase.zoom - vcZero.zoom) < 1e-10, 'zoom must match');
+            assert.ok(Math.abs(vcBase.panX - vcZero.panX) < 1e-10, 'panX must match');
+            assert.ok(Math.abs(vcBase.panY - vcZero.panY) < 1e-10, 'panY must match');
+        });
     });
     describe('applyTransform', () => {
         it('sets transform and transform-origin on the element', () => {

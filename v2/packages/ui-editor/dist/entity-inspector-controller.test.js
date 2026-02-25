@@ -226,4 +226,24 @@ test('EntityInspectorController: Apply on non-player entity does not call setEnt
     container.fireApply();
     assert.equal(app.speedCalls.length, 0, 'setEntitySpeed should not be called for non-player');
 });
+// D-007 verification: Apply dispatches moveEntity with updated coordinates.
+// This confirms the inspector wiring works correctly; D-007 is a discoverability issue, not a bug.
+test('D-007: EntityInspectorController: Apply dispatches moveEntity with updated position', () => {
+    const entity = makeEntity({ position: { x: 10, y: 20 } });
+    const app = makeApp(entity);
+    const container = makeContainer({
+        name: { value: 'Hero' },
+        'position.x': { value: '50' },
+        'position.y': { value: '80' },
+        solid: { checked: false },
+        spriteId: { value: '' },
+        animationClipId: { value: '' },
+    });
+    new EntityInspectorController(app, container);
+    container.fireApply();
+    assert.equal(app.moveCalls.length, 1, 'moveEntity should be called once on Apply');
+    assert.equal(app.moveCalls[0].entityId, 'ent-1');
+    assert.equal(app.moveCalls[0].x, 50);
+    assert.equal(app.moveCalls[0].y, 80);
+});
 //# sourceMappingURL=entity-inspector-controller.test.js.map
