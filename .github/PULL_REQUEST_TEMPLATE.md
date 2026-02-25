@@ -28,9 +28,9 @@
 
 ## Testing Evidence
 - Commands run:
-  - `cargo test --workspace`
-  - `npm test`
-  - `npm run ci`
+  - `cd v2 && npx tsc --build`
+  - `cd v2 && npm test`
+  - `cd v2 && npm run check:ascii -- <touched-files>`
 - Result summary:
 
 ## Reference Safety Checklist
