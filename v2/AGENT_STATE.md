@@ -17,6 +17,29 @@ None. Ready for next task.
 
 ## Last Completed Work (2026-02-25 -- latest)
 
+- 2026-02-25 [Codex] fix/ui-shell-followups-d005b-d008-d009 -- Phase 2 stabilization (direct entity drag in select mode):
+  - Added direct drag-to-move entity interaction in `EditorShellController` select tool path:
+    pointer down selects entity under cursor, pointer move applies snapped `entity:move` command-path updates,
+    pointer up closes a single undo batch for the whole drag gesture.
+  - Preserves existing viewport pan behavior (middle mouse and Space+left), paint/erase/rule-paint flows, and
+    select click behavior suppression after drag.
+  - Added focused regression coverage:
+    `EditorShellController select-drag moves entity and undo/redo restores positions`.
+  - Gates clean: `cd v2 && npx tsc --build`, `cd v2 && npm test`.
+  - Test count: 559 (16 contracts + 147 runtime-web + 396 ui-editor).
+- 2026-02-25 [Claude] fix/ui-shell-followups-d005b-d008-d009 -- UX follow-up fixes for deferred defects:
+  - D-005b: Arrow/WASD keys wired to `pendingMoveX`/`pendingMoveY` in `EditorShellController`; movement passed
+    into `setInput()` each rAF frame. HUD appends `| Arrows/WASD: move` hint when running.
+    Root-cause fix: movement block hoisted before the INPUT-focus guard; `blur()` added on Play/Resume.
+    Inspector field retaining focus was silently swallowing all movement keys. 2 additional INPUT-focus tests.
+  - D-008: Spawn alignment fixed in `createStarterGroundAndPlayer()` and `createPlayablePlayer()` using
+    `Math.floor(dim / 2 / tileSize) * tileSize` -- now tile-aligned (matches entity placement formula).
+  - D-009: Read-only Tags `<details>` section (open) added to `EntityInspectorController.refresh()`;
+    shows comma-separated tag values or `(none)`.
+  - D-010 (new, deferred): entity undo and entity delete non-functional; discovered during D-009 QA; separate PR.
+  - 10 new tests (4 D-005b keyboard/HUD, 2 D-005b INPUT-focus, 2 D-008 alignment, 2 D-009 tags display).
+  - Refactor: playtest input extracted into `playtest-input-map/state/controller.ts`; 4 additional tests.
+  - Test count: 558 (16 contracts + 147 runtime-web + 395 ui-editor).
 - 2026-02-25 [Codex] UI-SHELL-POLISH-001 QA RERUN CLOSEOUT -- Synced governed docs to the targeted rerun pass (`docs/qa/runs/qa-run-2026-02-25-ui-shell-blockers-7be7de3.md`): blockers `D-001`, `D-002`, `D-005a` marked verified fixed; evidence path recorded in Status Snapshot; deferred follow-ups retained (`D-005b`, `D-008`, `D-009`, plus runbook maintenance `D-006`).
 - 2026-02-25 [Claude] fix/ui-shell-polish-blockers -- Fixed QA blockers D-001, D-002, D-005a from first manual QA run:
   - D-001: `.tab-btn` flex basis `calc(33.33% - 1px)` + `white-space: normal` (3 per row, wraps "Getting Started").

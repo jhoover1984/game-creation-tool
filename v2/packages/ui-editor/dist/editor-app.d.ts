@@ -19,6 +19,11 @@ export declare class EditorApp {
     private canvas;
     private ctx;
     private hoverCell;
+    /**
+     * Optional runtime-only render overrides for entity positions during playtest.
+     * Keeps authored entity positions unchanged while allowing live preview movement.
+     */
+    private playtestEntityPositions;
     constructor();
     /**
      * Run export preflight checks and emit diagnostics/tasks.
@@ -105,6 +110,20 @@ export declare class EditorApp {
     getDiagnostics(): readonly Diagnostic[];
     /** Return currently selected entity, if any. */
     getSelectedEntity(): EntityDef | null;
+    /**
+     * Apply runtime render-only entity positions (e.g., from playtest snapshot).
+     * Pass `null` to clear and return to authored store positions.
+     */
+    setPlaytestEntityPositions(entities: Array<{
+        id: string;
+        x: number;
+        y: number;
+    }> | null): void;
+    /** Returns the currently rendered position (runtime override when present, otherwise authored). */
+    getRenderedEntityPosition(entityId: string): {
+        x: number;
+        y: number;
+    } | null;
     /** Return all quest graph nodes for Story panel workflows. */
     getQuestNodes(): readonly QuestGraphNode[];
     /** Return selected quest node, if any. */

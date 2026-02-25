@@ -16,6 +16,11 @@ export class EditorApp {
     canvas = null;
     ctx = null;
     hoverCell = null;
+    /**
+     * Optional runtime-only render overrides for entity positions during playtest.
+     * Keeps authored entity positions unchanged while allowing live preview movement.
+     */
+    playtestEntityPositions = null;
     constructor() {
         this.bus = new CommandBus();
         this.store = new ProjectStore(this.bus);
@@ -371,6 +376,33 @@ export class EditorApp {
             return null;
         return this.store.entities.find((e) => e.id === this.store.selectedEntityId) ?? null;
     }
+    /**
+     * Apply runtime render-only entity positions (e.g., from playtest snapshot).
+     * Pass `null` to clear and return to authored store positions.
+     */
+    setPlaytestEntityPositions(entities) {
+        if (!entities) {
+            this.playtestEntityPositions = null;
+            this.render();
+            return;
+        }
+        const next = new Map();
+        for (const e of entities) {
+            next.set(e.id, { x: e.x, y: e.y });
+        }
+        this.playtestEntityPositions = next;
+        this.render();
+    }
+    /** Returns the currently rendered position (runtime override when present, otherwise authored). */
+    getRenderedEntityPosition(entityId) {
+        const entity = this.store.entities.find((e) => e.id === entityId);
+        if (!entity)
+            return null;
+        const live = this.playtestEntityPositions?.get(entityId);
+        if (live)
+            return { x: live.x, y: live.y };
+        return { x: entity.position.x, y: entity.position.y };
+    }
     /** Return all quest graph nodes for Story panel workflows. */
     getQuestNodes() {
         return this.store.questGraph.nodes;
@@ -527,16 +559,19 @@ export class EditorApp {
         }
         // Draw entities
         for (const entity of this.store.entities) {
+            const live = this.playtestEntityPositions?.get(entity.id);
+            const rx = live?.x ?? entity.position.x;
+            const ry = live?.y ?? entity.position.y;
             ctx.fillStyle = entity.solid ? '#e74c3c' : '#3498db';
-            ctx.fillRect(entity.position.x, entity.position.y, entity.size.w, entity.size.h);
+            ctx.fillRect(rx, ry, entity.size.w, entity.size.h);
             if (entity.id === this.store.selectedEntityId) {
                 ctx.strokeStyle = '#f1c40f';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(entity.position.x, entity.position.y, entity.size.w, entity.size.h);
+                ctx.strokeRect(rx, ry, entity.size.w, entity.size.h);
             }
             ctx.fillStyle = '#fff';
             ctx.font = '10px monospace';
-            ctx.fillText(entity.name, entity.position.x + 2, entity.position.y + 12);
+            ctx.fillText(entity.name, rx + 2, ry + 12);
         }
         // Draw hovered tile cell outline for authoring feedback
         if (this.hoverCell) {

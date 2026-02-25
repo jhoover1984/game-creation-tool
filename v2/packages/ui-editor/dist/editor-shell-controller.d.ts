@@ -120,9 +120,12 @@ export declare class EditorShellController {
     private readonly onPointerLeaveClearHoverHandler;
     private readonly tabBarClickHandler;
     private readonly keydownHandler;
+    private readonly playtestInputController;
     private readonly onContextMenuHandler;
     private readonly playtest;
     private pendingInteract;
+    private pendingMoveX;
+    private pendingMoveY;
     private loopId;
     private lastPlaySnap;
     private resizeObserver;
@@ -130,6 +133,8 @@ export declare class EditorShellController {
     private readonly consoleLines;
     private isPainting;
     private lastPaintCell;
+    private draggedEntityId;
+    private draggedEntityStart;
     private suppressNextClickSelect;
     private currentTool;
     private currentTileId;

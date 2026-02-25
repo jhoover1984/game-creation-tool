@@ -16,6 +16,7 @@ import { AnimationPanelController } from './animation-panel-controller.js';
 import { ModalController } from './modal-controller.js';
 import { ContextMenuController } from './context-menu-controller.js';
 import { ViewportController } from './viewport-controller.js';
+import { PlaytestInputController } from './playtest-input-controller.js';
 
 export interface EditorShellElements {
   canvas: HTMLCanvasElement;
@@ -96,9 +97,12 @@ export class EditorShellController {
   private readonly onPointerLeaveClearHoverHandler: () => void;
   private readonly tabBarClickHandler: (e: Event) => void;
   private readonly keydownHandler: (e: Event) => void;
+  private readonly playtestInputController: PlaytestInputController;
   private readonly onContextMenuHandler: (event: MouseEvent) => void;
   private readonly playtest = new PlaytestRunner();
   private pendingInteract = false;
+  private pendingMoveX = 0;
+  private pendingMoveY = 0;
   private loopId: number | null = null;
   private lastPlaySnap: { tick: number; entities: Array<{ id: string; x: number; y: number }> } | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -106,6 +110,8 @@ export class EditorShellController {
   private readonly consoleLines: string[] = [];
   private isPainting = false;
   private lastPaintCell: string | null = null;
+  private draggedEntityId: string | null = null;
+  private draggedEntityStart: { x: number; y: number } | null = null;
   private suppressNextClickSelect = false;
   private currentTool: 'select' | 'paint' | 'erase' | 'entity' | 'rule-paint' = 'select';
   private currentTileId = 1;
@@ -253,8 +259,20 @@ export class EditorShellController {
         return;
       }
       if (event.button !== 0) return;
-      // Select tool: click-select is handled by the canvas click handler; no paint action needed.
-      if (this.currentTool === 'select') return;
+      if (this.currentTool === 'select') {
+        // Select + direct drag movement: click-select entity under cursor, then drag it on-grid.
+        this.selectEntityAtCanvasClientPoint(event.clientX, event.clientY);
+        const selectedId = this.app.store.selectedEntityId;
+        if (!selectedId) return;
+        const selected = this.app.store.entities.find((e) => e.id === selectedId);
+        if (!selected) return;
+        this.draggedEntityId = selectedId;
+        this.draggedEntityStart = { x: selected.position.x, y: selected.position.y };
+        this.app.beginPaintStroke(); // single undo group for the full drag gesture
+        this.suppressNextClickSelect = true;
+        event.preventDefault();
+        return;
+      }
       if (this.currentTool === 'entity') {
         const cell = this.pointerToCell(event);
         if (!cell) return;
@@ -294,6 +312,16 @@ export class EditorShellController {
       }
       const cell = this.pointerToCell(event);
       this.app.setHoverCell(cell?.tx ?? null, cell?.ty);
+      if (this.draggedEntityId && cell) {
+        const tileSize = this.app.store.manifest.tileSize;
+        const nextX = cell.tx * tileSize;
+        const nextY = cell.ty * tileSize;
+        const entity = this.app.store.entities.find((e) => e.id === this.draggedEntityId);
+        if (entity && (entity.position.x !== nextX || entity.position.y !== nextY)) {
+          this.app.moveEntity(this.draggedEntityId, nextX, nextY);
+        }
+        return;
+      }
       if (!this.isPainting) return;
       this.paintAtPointer(event);
     };
@@ -302,6 +330,16 @@ export class EditorShellController {
       if (this.viewport.isPanning) {
         this.viewport.endPan();
         this.updateCanvasCursor(this.currentTool);
+        return;
+      }
+      if (this.draggedEntityId) {
+        const entity = this.app.store.entities.find((e) => e.id === this.draggedEntityId);
+        const moved = !!(this.draggedEntityStart && entity
+          && (entity.position.x !== this.draggedEntityStart.x || entity.position.y !== this.draggedEntityStart.y));
+        this.app.endPaintStroke();
+        this.draggedEntityId = null;
+        this.draggedEntityStart = null;
+        this.suppressNextClickSelect = moved;
         return;
       }
       if (!this.isPainting) return;
@@ -413,9 +451,12 @@ export class EditorShellController {
       this.inspectorController.refresh();
       this.storyController?.refresh();
       this.stopPlayLoop(); // D-005a: halt run loop before exit
+      this.playtestInputController.reset();
+      this.pendingMoveX = 0; this.pendingMoveY = 0; // D-005b
       this.playtest.exit();
       this.playtest.clearTrace();
       this.lastPlaySnap = null;
+      this.app.setPlaytestEntityPositions(null);
       this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ROW_CAP_EXCEEDED', '');
       this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ACTION_CAP_EXCEEDED', '');
       this.effectsController?.setPlaytestTick(0);
@@ -456,6 +497,7 @@ export class EditorShellController {
       this.stopPlayLoop(); // D-005a: halt run loop before exit
       this.playtest.exit();
       this.lastPlaySnap = null;
+      this.app.setPlaytestEntityPositions(null);
       this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ROW_CAP_EXCEEDED', '');
       this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ACTION_CAP_EXCEEDED', '');
       this.effectsController?.setPlaytestTick(0);
@@ -487,8 +529,18 @@ export class EditorShellController {
     });
 
     // Keyboard shortcuts -- UI-HOTKEY-001
+    this.playtestInputController = new PlaytestInputController({
+      target: elements.keydownTarget,
+      isRunning: () => this.playtest.getStatus() === 'running',
+      onChange: (input) => {
+        this.pendingMoveX = input.moveX;
+        this.pendingMoveY = input.moveY;
+      },
+    });
+
     this.keydownHandler = (e: Event) => {
       const ke = e as KeyboardEvent;
+      // Editor shortcuts below: guarded by input focus so typing in inspector fields is unaffected.
       const target = ke.target as { tagName?: string } | null;
       const tag = target?.tagName?.toUpperCase() ?? '';
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -583,9 +635,12 @@ export class EditorShellController {
       this.inspectorController.refresh();
       this.storyController?.refresh();
       this.stopPlayLoop(); // D-005a: halt run loop before exit
+      this.playtestInputController.reset();
+      this.pendingMoveX = 0; this.pendingMoveY = 0; // D-005b
       this.playtest.exit();
       this.playtest.clearTrace();
       this.lastPlaySnap = null;
+      this.app.setPlaytestEntityPositions(null);
       this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ROW_CAP_EXCEEDED', '');
       this.app.diagnosticStore.removeByCodeAndPath('BEHAV_ACTION_CAP_EXCEEDED', '');
       this.effectsController?.setPlaytestTick(0);
@@ -614,13 +669,16 @@ export class EditorShellController {
     });
 
     elements.btnPlay?.addEventListener('click', () => {
+      (globalThis.document?.activeElement as { blur?(): void } | null)?.blur?.(); // D-005b: release input focus on play start
       this.playtest.init(this.app.store.entities, this.app.store.tileLayers, this.app.store.manifest.tileSize);
       this.playtest.setBehaviors(this.app.store.behaviors);
       const started = this.playtest.enter();
       if (!started) return;
+      this.lastPlaySnap = this.playtest.snapshot();
+      this.app.setPlaytestEntityPositions(this.lastPlaySnap.entities);
       elements.status.textContent = `Playtest: ${this.playtest.getStatus()}`;
       this.writeConsole('Playtest entered.');
-      this.updatePlaytestHud(null);
+      this.updatePlaytestHud(this.lastPlaySnap);
       this.checklistController?.notifyPlaytestEntered();
       this.behaviorController?.notifyPlaytestEntered();
       this.effectsController?.setPlaytestTick(0);
@@ -631,8 +689,10 @@ export class EditorShellController {
       const status = this.playtest.getStatus();
       if (status === 'running') {
         this.stopPlayLoop(); // D-005a: halt the run loop before pausing
+        this.playtestInputController.reset();
         this.playtest.pause();
       } else if (status === 'paused') {
+        (globalThis.document?.activeElement as { blur?(): void } | null)?.blur?.(); // D-005b: release input focus on resume
         this.playtest.resume();
         this.startPlayLoop(); // D-005a: restart the loop on resume
       }
@@ -704,6 +764,7 @@ export class EditorShellController {
     this.elements.canvas.removeEventListener('pointerleave', this.onPointerUpHandler);
     this.elements.canvas.removeEventListener('pointerleave', this.onPointerLeaveClearHoverHandler);
     this.elements.canvas.removeEventListener('pointercancel', this.onPointerUpHandler);
+    this.playtestInputController.dispose();
     this.inspectorController.dispose();
     this.storyController?.dispose();
     this.tasksController.dispose();
@@ -722,11 +783,12 @@ export class EditorShellController {
     if (this.loopId !== null) return;
     const tick = (ts: number) => {
       if (this.playtest.getStatus() !== 'running') { this.loopId = null; return; }
-      this.playtest.setInput({ moveX: 0, moveY: 0, interact: this.pendingInteract });
+      this.playtest.setInput({ moveX: this.pendingMoveX, moveY: this.pendingMoveY, interact: this.pendingInteract }); // D-005b
       this.pendingInteract = false;
       const snap = this.playtest.step();
       if (snap) {
         this.lastPlaySnap = snap;
+        this.app.setPlaytestEntityPositions(snap.entities);
         this.effectsController?.setPlaytestTick(snap.tick);
         this.updatePlaytestHud(snap);
       }
@@ -787,6 +849,7 @@ export class EditorShellController {
     }
 
     if (snap) {
+      this.app.setPlaytestEntityPositions(snap.entities);
       this.effectsController?.setPlaytestTick(snap.tick);
       const primary = snap.entities[0];
       const pos = primary ? ` @ (${Math.round(primary.x)},${Math.round(primary.y)})` : '';
@@ -827,14 +890,15 @@ export class EditorShellController {
     const hud = this.elements.playtestHud;
     if (!hud) return;
     const state = this.playtest.getStatus();
+    const hint = state === 'running' ? ' | Arrows/WASD: move' : ''; // D-005b
     if (!snap) {
-      hud.textContent = `Playtest: ${state}`;
+      hud.textContent = `Playtest: ${state}${hint}`;
       return;
     }
     const playerId = this.app.store.entities.find((e) => e.tags.includes('player'))?.id ?? null;
     const player = playerId ? snap.entities.find((e) => e.id === playerId) : null;
     const pos = player ? `, player=(${Math.round(player.x)},${Math.round(player.y)})` : '';
-    hud.textContent = `Playtest: ${state}, tick=${snap.tick}${pos}`;
+    hud.textContent = `Playtest: ${state}, tick=${snap.tick}${pos}${hint}`;
   }
 
   private paintAtPointer(event: PointerEvent): void {
@@ -913,14 +977,9 @@ export class EditorShellController {
    */
   private createPlayablePlayer(): void {
     const tileSize = this.app.store.manifest.tileSize;
-    const centerX = Math.max(
-      0,
-      Math.floor(this.app.store.manifest.resolution.width / 2) - Math.floor(tileSize / 2),
-    );
-    const centerY = Math.max(
-      0,
-      Math.floor(this.app.store.manifest.resolution.height / 2) - Math.floor(tileSize / 2),
-    );
+    // D-008: snap to tile boundary (matches entity placement tool: tileIndex * tileSize)
+    const centerX = Math.floor(this.app.store.manifest.resolution.width / 2 / tileSize) * tileSize;
+    const centerY = Math.floor(this.app.store.manifest.resolution.height / 2 / tileSize) * tileSize;
     const beforeCount = this.app.store.entities.length;
     this.app.createEntity('Player', centerX, centerY);
     if (this.app.store.entities.length <= beforeCount) return;
@@ -953,7 +1012,7 @@ export class EditorShellController {
     }
     this.app.endPaintStroke();
 
-    const playerX = Math.max(0, Math.floor(this.app.store.manifest.resolution.width / 2) - Math.floor(tileSize / 2));
+    const playerX = Math.floor(this.app.store.manifest.resolution.width / 2 / tileSize) * tileSize; // D-008: tile-aligned
     const playerY = Math.max(0, (groundY - 1) * tileSize);
     const beforeCount = this.app.store.entities.length;
     this.app.createEntity('Player', playerX, playerY);

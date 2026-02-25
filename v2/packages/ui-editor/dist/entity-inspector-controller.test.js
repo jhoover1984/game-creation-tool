@@ -226,6 +226,25 @@ test('EntityInspectorController: Apply on non-player entity does not call setEnt
     container.fireApply();
     assert.equal(app.speedCalls.length, 0, 'setEntitySpeed should not be called for non-player');
 });
+// D-009: read-only Tags section
+test('D-009: inspector renders Tags section showing entity tag values', () => {
+    const entity = makeEntity({ tags: ['player', 'hero'] });
+    const app = makeApp(entity);
+    const container = makeContainer({});
+    new EntityInspectorController(app, container);
+    const html = container.innerHTML;
+    assert.ok(html.includes('Tags'), 'should render Tags section');
+    assert.ok(html.includes('player, hero'), 'should list tag values');
+});
+test('D-009: inspector renders Tags section showing "(none)" when entity has no tags', () => {
+    const entity = makeEntity({ tags: [] });
+    const app = makeApp(entity);
+    const container = makeContainer({});
+    new EntityInspectorController(app, container);
+    const html = container.innerHTML;
+    assert.ok(html.includes('Tags'), 'should render Tags section');
+    assert.ok(html.includes('(none)'), 'should show "(none)" for empty tags');
+});
 // D-007 verification: Apply dispatches moveEntity with updated coordinates.
 // This confirms the inspector wiring works correctly; D-007 is a discoverability issue, not a bug.
 test('D-007: EntityInspectorController: Apply dispatches moveEntity with updated position', () => {

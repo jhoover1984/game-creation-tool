@@ -273,6 +273,31 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
   - Blockers closed via rerun verification: `D-001`, `D-002`, `D-005a`.
   - Evidence captured under `docs/qa/evidence/2026-02-25-ui-shell-blockers-7be7de3/`.
   - Deferred follow-ups remain open: `D-005b`, `D-008`, `D-009` (and non-product checklist maintenance item `D-006`).
+- UX follow-up fixes -- 2026-02-25 (`fix/ui-shell-followups-d005b-d008-d009`):
+  - `D-005b`: Arrow keys and WASD wired to `pendingMoveX`/`pendingMoveY` in `EditorShellController`;
+    movement vector passed into `setInput()` each rAF frame while playtest is running.
+    HUD appends `| Arrows/WASD: move` hint when state is `running`.
+    Root cause (found in QA): movement block was after the `INPUT/TEXTAREA/SELECT` focus guard;
+    inspector fields retaining focus silently swallowed all movement keys.
+    Fix: movement block hoisted before the focus guard; `blur()` added on Play start and Resume.
+  - `D-008`: Spawn alignment fixed in `createStarterGroundAndPlayer()` and `createPlayablePlayer()`;
+    uses `Math.floor(dim / 2 / tileSize) * tileSize` so X and Y are always tile-aligned
+    (matches entity placement tool formula `cell.tx * tileSize`).
+  - `D-009`: Read-only Tags `<details>` section (open by default) added to `EntityInspectorController.refresh()`;
+    shows comma-separated tag values or `(none)` when empty; no Apply handler changes needed.
+  - `D-010` (new, deferred): entity undo and entity delete non-functional; discovered during EI-04; separate PR.
+  - 10 new tests (4 D-005b keyboard/HUD, 2 D-005b INPUT-focus fix, 2 D-008 alignment, 2 D-009 tags display).
+  - Refactor (same PR): playtest input handling extracted into dedicated modules
+    (`playtest-input-map.ts`, `playtest-input-state.ts`, `playtest-input-controller.ts`,
+    `playtest-input-controller.test.ts`); `EditorShellController` wired to use new input controller.
+    4 additional tests added (2 end-to-end position, 1 pause stability, 1 opposite-direction cancel).
+    Test count update: 559 (16 contracts + 147 runtime-web + 396 ui-editor).
+- UX interaction follow-up -- 2026-02-25 (`fix/ui-shell-followups-d005b-d008-d009`):
+  - Added direct drag-to-move for entities in `select` mode:
+    pointer down selects target entity, pointer move applies snapped command-path `entity:move`,
+    pointer up completes a single undo batch so one undo reverts the full drag.
+  - Added focused regression test for drag + undo/redo roundtrip in `editor-shell-controller.test.ts`.
+  - Automated gates remain green after the change.
 - Done (Stabilization) -- 2026-02-25 (`fix/ui-shell-polish-blockers`):
   - `D-001`: `.tab-btn` flex basis changed to `calc(33.33% - 1px)` (3 per row, 80px each) + `white-space: normal`
     so all 9 tab labels are readable at any viewport; "Getting Started" wraps naturally to 2 lines.
@@ -286,12 +311,12 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
   - `D-007`: verification test confirms `moveEntity` is called on Apply -- classified as discoverability issue only.
   - 14 new tests (3 tab-readability, 4 viewport-margin unit, 1 framing integration, 4 run-loop, 1 inspector-apply,
     1 resize-observer re-fit).
-- test count: 544 (16 contracts + 147 runtime-web + 381 ui-editor) -- updated 2026-02-25
+- test count: 559 (16 contracts + 147 runtime-web + 396 ui-editor) -- updated 2026-02-25
   - Note: root `npm test` output shows the last workspace (ui-editor) summary as apparent total; use per-workspace counts.
 
 ## Quality Gate Status
 - `npm run ci` (v2): passing
-- TypeScript package tests: 544 passing total (`16 contracts + 147 runtime-web + 381 ui-editor`)
+- TypeScript package tests: 559 passing total (`16 contracts + 147 runtime-web + 396 ui-editor`)
 - Rust workspace tests: passing (separate root workflow scope)
 - Lint/typecheck/tests for v2 packages: passing
 

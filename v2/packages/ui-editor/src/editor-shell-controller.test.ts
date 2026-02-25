@@ -518,6 +518,63 @@ test('EditorShellController batches drag paint into a single undo step', () => {
   controller.dispose();
 });
 
+test('EditorShellController select-drag moves entity and undo/redo restores positions', () => {
+  const canvas = createMockCanvas();
+  const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+  const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+  const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+  const status = { textContent: '' } as unknown as HTMLElement;
+
+  const controller = new EditorShellController({
+    canvas,
+    tasksContainer,
+    inspectorContainer,
+    consoleContainer,
+    status,
+  });
+
+  controller.app.createEntity('DragMe', 0, 0);
+  const entityId = controller.app.store.entities[0].id;
+
+  (canvas as unknown as { emit(type: string, event: Event): void }).emit('pointerdown', {
+    button: 0,
+    clientX: 4,
+    clientY: 4,
+    preventDefault() {},
+  } as unknown as Event);
+  (canvas as unknown as { emit(type: string, event: Event): void }).emit('pointermove', {
+    button: 0,
+    clientX: 40,
+    clientY: 4,
+    preventDefault() {},
+  } as unknown as Event);
+  (canvas as unknown as { emit(type: string, event: Event): void }).emit('pointerup', {
+    button: 0,
+    clientX: 40,
+    clientY: 4,
+    preventDefault() {},
+  } as unknown as Event);
+
+  let entity = controller.app.store.entities.find((e) => e.id === entityId);
+  assert.ok(entity, 'drag target entity should still exist');
+  assert.equal(entity.position.x, 32);
+  assert.equal(entity.position.y, 0);
+
+  controller.app.undo();
+  entity = controller.app.store.entities.find((e) => e.id === entityId);
+  assert.ok(entity, 'entity should still exist after undo');
+  assert.equal(entity.position.x, 0);
+  assert.equal(entity.position.y, 0);
+
+  controller.app.redo();
+  entity = controller.app.store.entities.find((e) => e.id === entityId);
+  assert.ok(entity, 'entity should still exist after redo');
+  assert.equal(entity.position.x, 32);
+  assert.equal(entity.position.y, 0);
+
+  controller.dispose();
+});
+
 test('EditorShellController apply map recreates project with requested dimensions', () => {
   const canvas = createMockCanvas();
   const tasksContainer = new FakeContainer() as unknown as HTMLElement;
@@ -1063,4 +1120,395 @@ test('D-002: ResizeObserver re-fits viewport on container resize -- no-clip inva
     (globalThis as Record<string, unknown>)['ResizeObserver'] = origResizeObserver;
     raf.restore();
   }
+});
+
+// --- D-005b: Keyboard movement tests ---
+// makeKeyTarget captures keydown/keyup handlers registered by the controller.
+
+function makeKeyTarget() {
+  const map: Record<string, Array<(e: Event) => void>> = {};
+  return {
+    addEventListener(type: string, fn: (e: Event) => void) { (map[type] ??= []).push(fn); },
+    removeEventListener() { /* no-op */ },
+    fire(type: string, key: string) {
+      const evt = {
+        key,
+        ctrlKey: false, altKey: false, metaKey: false, shiftKey: false,
+        preventDefault() {},
+        target: { tagName: 'BODY' },
+      } as unknown as KeyboardEvent;
+      map[type]?.forEach((h) => h(evt as unknown as Event));
+    },
+    /** Fire a key event as if the active element has the given tagName (e.g. 'INPUT'). */
+    fireFrom(type: string, key: string, tagName: string) {
+      const evt = {
+        key,
+        ctrlKey: false, altKey: false, metaKey: false, shiftKey: false,
+        preventDefault() {},
+        target: { tagName },
+      } as unknown as KeyboardEvent;
+      map[type]?.forEach((h) => h(evt as unknown as Event));
+    },
+  };
+}
+
+test('D-005b: opposing horizontal keys cancel while both are held', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const btnPlay = new FakeButton();
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, btnPlay, keydownTarget,
+    });
+
+    btnPlay.click(); // status becomes 'running'
+
+    kt.fire('keydown', 'ArrowRight');
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, 1,
+      'ArrowRight should set pendingMoveX=1',
+    );
+
+    kt.fire('keydown', 'ArrowLeft');
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, 0,
+      'Opposing keys should cancel to pendingMoveX=0 while both are held',
+    );
+
+    kt.fire('keyup', 'ArrowRight');
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, -1,
+      'Releasing ArrowRight while ArrowLeft is held should resolve pendingMoveX=-1',
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+test('D-005b: ArrowRight keyup clears pendingMoveX to 0', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const btnPlay = new FakeButton();
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, btnPlay, keydownTarget,
+    });
+
+    btnPlay.click();
+    kt.fire('keydown', 'ArrowRight');
+    assert.equal((controller as unknown as { pendingMoveX: number }).pendingMoveX, 1);
+
+    kt.fire('keyup', 'ArrowRight');
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, 0,
+      'keyup ArrowRight should clear pendingMoveX back to 0',
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+test('D-005b: movement keys are no-ops when playtest is stopped', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, keydownTarget,
+    });
+
+    // No btnPlay click -- playtest is stopped
+    kt.fire('keydown', 'ArrowRight');
+    kt.fire('keydown', 'ArrowUp');
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, 0,
+      'ArrowRight should not set pendingMoveX when stopped',
+    );
+    assert.equal(
+      (controller as unknown as { pendingMoveY: number }).pendingMoveY, 0,
+      'ArrowUp should not set pendingMoveY when stopped',
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+test('D-005b: HUD contains movement hint when playtest is running', () => {
+  const raf = makeRafMock();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const playtestHud = { textContent: '' } as unknown as HTMLElement;
+    const btnPlay = new FakeButton();
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, playtestHud, btnPlay,
+    });
+
+    btnPlay.click();
+    raf.flush(3);
+
+    assert.ok(
+      (playtestHud.textContent ?? '').includes('Arrows/WASD: move'),
+      `HUD should include movement hint when running; got: "${playtestHud.textContent}"`,
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+// D-005b (fix): movement keys bypass INPUT focus guard during playtest
+test('D-005b (fix): ArrowRight from focused INPUT sets pendingMoveX=1 while running', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const btnPlay = new FakeButton();
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, btnPlay, keydownTarget,
+    });
+
+    btnPlay.click(); // playtest running
+    // Simulate pressing ArrowRight while an inspector INPUT has focus
+    kt.fireFrom('keydown', 'ArrowRight', 'INPUT');
+
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, 1,
+      'pendingMoveX should be 1 even when event.target is INPUT during playtest',
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+test('D-005b (fix): editor shortcut s from INPUT when stopped does not set pendingMoveX', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, keydownTarget,
+    });
+
+    // Playtest is stopped -- 's' from INPUT should be guarded (no movement)
+    kt.fireFrom('keydown', 's', 'INPUT');
+
+    assert.equal(
+      (controller as unknown as { pendingMoveX: number }).pendingMoveX, 0,
+      'pendingMoveX must remain 0 when stopped and target is INPUT',
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+// D-005b (end-to-end): full movement pipeline -- key capture -> setInput -> step -> position change
+test('D-005b (end-to-end): ArrowRight held over 10 frames advances player X in snapshot', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const btnPlay = new FakeButton();
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, btnPlay, keydownTarget,
+    });
+
+    // Plant a player entity in the store so playtest.init() sees isPlayer=true
+    (controller as unknown as { createPlayablePlayer(): void }).createPlayablePlayer();
+    const playerId = controller.app.store.entities.find((e) => e.tags.includes('player'))?.id;
+    assert.ok(playerId !== undefined, 'player entity must exist with player tag');
+
+    // Start playtest and run enough frames to establish initial position.
+    // flush(3): constructor enqueues a double-rAF for viewport fitting (2 slots)
+    // before the playtest tick; need at least 3 flushes to reach the first tick.
+    btnPlay.click();
+    raf.flush(3);
+
+    type SnapEnt = { id: string; x: number; y: number };
+    type Snap = { tick: number; entities: SnapEnt[] };
+    const getSnap = () => (controller as unknown as { lastPlaySnap: Snap | null }).lastPlaySnap;
+
+    const snap0 = getSnap();
+    assert.ok(snap0 !== null, 'snapshot must exist after first frame');
+    const initialX = snap0!.entities.find((e) => e.id === playerId)?.x ?? 0;
+
+    // Hold ArrowRight and run 10 frames
+    kt.fire('keydown', 'ArrowRight');
+    raf.flush(10);
+
+    const snap1 = getSnap();
+    assert.ok(snap1 !== null, 'snapshot must exist after movement frames');
+    const finalX = snap1!.entities.find((e) => e.id === playerId)?.x ?? 0;
+
+    assert.ok(
+      finalX > initialX,
+      `player X must increase after 10 frames with ArrowRight; initial=${initialX}, final=${finalX}`,
+    );
+
+    const authoredX = controller.app.store.entities.find((e) => e.id === playerId)?.position.x ?? 0;
+    const renderedX = controller.app.getRenderedEntityPosition(playerId!)?.x ?? 0;
+    assert.equal(
+      authoredX, initialX,
+      'authored store position should remain unchanged during playtest preview',
+    );
+    assert.ok(
+      renderedX > authoredX,
+      `rendered preview X should advance beyond authored X; authored=${authoredX}, rendered=${renderedX}`,
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+// D-005b (pause): pausing stops the rAF loop -- tick must not advance after Pause
+test('D-005b (pause): tick does not advance after Pause, movement stops', () => {
+  const raf = makeRafMock();
+  const kt = makeKeyTarget();
+  try {
+    const canvas = createMockCanvas();
+    const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+    const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+    const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+    const status = { textContent: '' } as unknown as HTMLElement;
+    const btnPlay = new FakeButton();
+    const btnPause = new FakeButton();
+    const keydownTarget = kt as unknown as EventTarget;
+
+    const controller = new EditorShellController({
+      canvas, tasksContainer, inspectorContainer, consoleContainer, status, btnPlay, btnPause, keydownTarget,
+    });
+
+    (controller as unknown as { createPlayablePlayer(): void }).createPlayablePlayer();
+    btnPlay.click();
+    raf.flush(3);
+
+    type Snap = { tick: number; entities: Array<{ id: string; x: number; y: number }> };
+    const getSnap = () => (controller as unknown as { lastPlaySnap: Snap | null }).lastPlaySnap;
+
+    const tickBeforePause = getSnap()?.tick ?? 0;
+    assert.ok(tickBeforePause > 0, `tick must be > 0 before pause, got ${tickBeforePause}`);
+
+    // Pause stops the loop; subsequent flush calls have an empty queue
+    btnPause.click();
+    raf.flush(5);
+
+    const tickAfterPause = getSnap()?.tick ?? 0;
+    assert.equal(
+      tickAfterPause, tickBeforePause,
+      `tick must not advance while paused (before=${tickBeforePause}, after=${tickAfterPause})`,
+    );
+
+    controller.dispose();
+  } finally {
+    raf.restore();
+  }
+});
+
+// --- D-008: Tile-aligned spawn tests ---
+
+test('D-008: createStarterGroundAndPlayer -- player spawn X is a multiple of tileSize', () => {
+  const canvas = createMockCanvas();
+  const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+  const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+  const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+  const status = { textContent: '' } as unknown as HTMLElement;
+
+  const controller = new EditorShellController({ canvas, tasksContainer, inspectorContainer, consoleContainer, status });
+
+  (controller as unknown as { createStarterGroundAndPlayer(): void }).createStarterGroundAndPlayer();
+
+  const player = controller.app.store.entities.find((e) => e.tags.includes('player'));
+  assert.ok(player !== undefined, 'player entity should exist after createStarterGroundAndPlayer');
+  const tileSize = controller.app.store.manifest.tileSize;
+  assert.equal(
+    player.position.x % tileSize, 0,
+    `player spawn X ${player.position.x} must be a multiple of tileSize ${tileSize}`,
+  );
+  assert.equal(
+    player.position.y % tileSize, 0,
+    `player spawn Y ${player.position.y} must be a multiple of tileSize ${tileSize}`,
+  );
+
+  controller.dispose();
+});
+
+test('D-008: createPlayablePlayer -- player spawn X and Y are both multiples of tileSize', () => {
+  const canvas = createMockCanvas();
+  const tasksContainer = new FakeContainer() as unknown as HTMLElement;
+  const inspectorContainer = new FakeContainer() as unknown as HTMLElement;
+  const consoleContainer = new FakeContainer() as unknown as HTMLElement;
+  const status = { textContent: '' } as unknown as HTMLElement;
+
+  const controller = new EditorShellController({ canvas, tasksContainer, inspectorContainer, consoleContainer, status });
+
+  (controller as unknown as { createPlayablePlayer(): void }).createPlayablePlayer();
+
+  const player = controller.app.store.entities.find((e) => e.tags.includes('player'));
+  assert.ok(player !== undefined, 'player entity should exist after createPlayablePlayer');
+  const tileSize = controller.app.store.manifest.tileSize;
+  assert.equal(
+    player.position.x % tileSize, 0,
+    `player spawn X ${player.position.x} must be a multiple of tileSize ${tileSize}`,
+  );
+  assert.equal(
+    player.position.y % tileSize, 0,
+    `player spawn Y ${player.position.y} must be a multiple of tileSize ${tileSize}`,
+  );
+
+  controller.dispose();
 });

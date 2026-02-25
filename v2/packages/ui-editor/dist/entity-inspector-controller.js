@@ -23,6 +23,9 @@ export class EntityInspectorController {
             const speed = typeof entity.speed === 'number' && entity.speed >= 0 ? Math.round(entity.speed) : 120;
             html += `<details class="inspector-section" open><summary class="inspector-section-title">Player Config</summary><div class="inspector-section-fields"><label class="inspector-field"><span>Speed (px/s)</span><input type="number" data-path="speed" value="${speed}" min="0" step="1"></label></div></details>`;
         }
+        // D-009: read-only tags display -- open by default so tags are immediately visible
+        const tagsText = entity.tags.length > 0 ? entity.tags.join(', ') : '(none)';
+        html += `<details class="inspector-section" open><summary class="inspector-section-title">Tags</summary><div class="inspector-section-fields"><p class="inspector-tags-list">${tagsText}</p></div></details>`;
         this.container.innerHTML = html;
     }
     dispose() {
