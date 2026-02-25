@@ -17,6 +17,16 @@ None. Ready for next task.
 
 ## Last Completed Work (2026-02-25 -- latest)
 
+- 2026-02-25 [Codex] UI-SHELL-POLISH-001 QA RERUN CLOSEOUT -- Synced governed docs to the targeted rerun pass (`docs/qa/runs/qa-run-2026-02-25-ui-shell-blockers-7be7de3.md`): blockers `D-001`, `D-002`, `D-005a` marked verified fixed; evidence path recorded in Status Snapshot; deferred follow-ups retained (`D-005b`, `D-008`, `D-009`, plus runbook maintenance `D-006`).
+- 2026-02-25 [Claude] fix/ui-shell-polish-blockers -- Fixed QA blockers D-001, D-002, D-005a from first manual QA run:
+  - D-001: `.tab-btn` flex basis `calc(33.33% - 1px)` + `white-space: normal` (3 per row, wraps "Getting Started").
+  - D-002: `fitToMap()` optional `margin` param + `FRAMING_MARGIN_PX=4` in `fitViewportToMap()` eliminates right/bottom clip.
+    `ResizeObserver` added to constructor; fires debounced `fitViewportToMap()` on container resize (CV-01, CV-05).
+  - D-005a: rAF run loop (`startPlayLoop`/`stopPlayLoop`) added; HUD now shows live tick/position on Play.
+  - D-007: `moveEntity` verified working on Apply -- classified as discoverability issue, no code fix.
+  - 14 new tests (3 D-001 tab-readability, 4 D-002 viewport-margin, 1 D-002 integration, 4 D-005a run-loop,
+    1 D-007 inspector, 1 D-002 resize-observer re-fit).
+  - Test count: 544 (16 contracts + 147 runtime-web + 381 ui-editor).
 - 2026-02-25 [Codex] UI-SHELL-POLISH-001 QA DOC SYNC -- Updated manual QA governance after first full run: patched `docs/runbooks/Manual QA Checklist.md` to use reliable TC-03 diagnostic triggers, updated Status Snapshot with completed manual QA outcome (FAIL), and normalized run defect taxonomy in `docs/qa/runs/qa-run-2026-02-24-ui-shell-polish-8483098.md` (`D-001`, `D-002`, `D-005a` blockers; follow-up defects logged).
 - 2026-02-25 [Codex] DOCS-GITFLOW -- Added `docs/runbooks/GitHub Workflow (Solo).md` and synced doc references in `docs/DOCUMENTATION_INDEX.md`, `docs/runbooks/PR Governance Checklist.md`, and `docs/status/V2 Status Snapshot.md` for protected-main + session-branch workflow.
 

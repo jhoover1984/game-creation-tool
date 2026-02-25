@@ -266,12 +266,32 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
     `D-005a` (HUD tick/position data not visible).
   - Follow-ups logged: `D-005b`, `D-006` (runbook maintenance), `D-007`, `D-008`, `D-009`.
   - Evidence captured under `docs/qa/evidence/2026-02-24-ui-shell-polish-8483098/`.
-- test count: 530 (16 contracts + 147 runtime-web + 367 ui-editor) -- updated 2026-02-24
+- QA blocker rerun (targeted) -- 2026-02-25 (`fix/ui-shell-polish-blockers`):
+  - Targeted rerun executed using `docs/qa/runs/qa-run-2026-02-25-ui-shell-blockers-7be7de3.md`.
+  - Scope: recheck only previously failing blocker rows `SH-02`, `CV-01`, `CV-02`, `CV-05`, `PT-01`, `PT-02`, `PT-03`.
+  - Result: **PASS**.
+  - Blockers closed via rerun verification: `D-001`, `D-002`, `D-005a`.
+  - Evidence captured under `docs/qa/evidence/2026-02-25-ui-shell-blockers-7be7de3/`.
+  - Deferred follow-ups remain open: `D-005b`, `D-008`, `D-009` (and non-product checklist maintenance item `D-006`).
+- Done (Stabilization) -- 2026-02-25 (`fix/ui-shell-polish-blockers`):
+  - `D-001`: `.tab-btn` flex basis changed to `calc(33.33% - 1px)` (3 per row, 80px each) + `white-space: normal`
+    so all 9 tab labels are readable at any viewport; "Getting Started" wraps naturally to 2 lines.
+  - `D-002`: `ViewportController.fitToMap()` gains optional `margin` parameter; `fitViewportToMap()` passes
+    `FRAMING_MARGIN_PX=4` so the canvas is always inset 4px from container edges -- eliminates right/bottom clip.
+    `ResizeObserver` added to `EditorShellController` constructor; fires `fitViewportToMap()` (debounced via rAF)
+    on every container size change -- fixes CV-01 (resize re-clips) and CV-05 (window drag re-clips).
+  - `D-005a`: rAF-based run loop (`startPlayLoop`/`stopPlayLoop`) added to `EditorShellController`;
+    Play now continuously advances ticks and updates the HUD each frame; Pause retains last tick/position;
+    movement input remains out of scope (D-005b follow-up).
+  - `D-007`: verification test confirms `moveEntity` is called on Apply -- classified as discoverability issue only.
+  - 14 new tests (3 tab-readability, 4 viewport-margin unit, 1 framing integration, 4 run-loop, 1 inspector-apply,
+    1 resize-observer re-fit).
+- test count: 544 (16 contracts + 147 runtime-web + 381 ui-editor) -- updated 2026-02-25
   - Note: root `npm test` output shows the last workspace (ui-editor) summary as apparent total; use per-workspace counts.
 
 ## Quality Gate Status
 - `npm run ci` (v2): passing
-- TypeScript package tests: 530 passing total (`16 contracts + 147 runtime-web + 367 ui-editor`)
+- TypeScript package tests: 544 passing total (`16 contracts + 147 runtime-web + 381 ui-editor`)
 - Rust workspace tests: passing (separate root workflow scope)
 - Lint/typecheck/tests for v2 packages: passing
 
