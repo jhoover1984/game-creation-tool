@@ -1,6 +1,6 @@
 # V2 Status Snapshot
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## Purpose
 Provide a single-page, current-state summary of v2 implementation progress, quality gates, and immediate priorities.
@@ -23,6 +23,8 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
   - contract/schema/doc/test coupling checks in CI
   - status automation command (`npm run status`)
   - canonical architecture/design/production docs added and indexed
+  - solo GitHub operating runbook added (`docs/runbooks/GitHub Workflow (Solo).md`) to standardize one-branch-per-session, one-PR-at-end workflow for protected `main`
+  - manual QA runbook added (`docs/runbooks/Manual QA Checklist.md`): canonical browser verification matrix for all `Full QA` PRs touching shell/layout/viewport/inspector/playtest/onboarding
 
 ### Contracts and Validation
 - Done:
@@ -249,7 +251,7 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
   - A8: Task list items carry severity-specific border-color using status tokens (`--status-err-bg` for error/fatal, `--status-warn-bg` for warning).
   - A9: Token compliance confirmed green; no raw hex in non-token CSS files.
   - Tests: 2 new viewport startup-fit scenario tests; 4 new shell-structure compliance tests in visual-tokens.test.ts; 1 canvas box-shadow compliance test; 1 test fix (onboarding CTA label assertion); 1 test name updated.
-- QA signoff (in progress) -- 2026-02-24 (`UI-SHELL-POLISH-001` QA pass):
+- QA signoff (manual run complete, failed) -- 2026-02-25 (`UI-SHELL-POLISH-001` QA pass):
   - Shell-level framing integration tests added (2 tests in `editor-shell-controller.test.ts`): exercise
     the full `EditorShellController -> fitViewportToMap() -> ViewportController -> applyTransform()` chain.
     Assert the no-clip invariant (`scaledWidth <= containerWidth`, `scaledHeight <= containerHeight`) on
@@ -257,9 +259,13 @@ Provide a single-page, current-state summary of v2 implementation progress, qual
   - V2 UI Blueprint rewritten from implementation notes to a full as-built section with target architecture
     clearly separated.
   - Automated gates: passing (367 ui-editor tests, TypeScript build clean, ASCII check clean).
-  - Manual QA matrix: PENDING -- requires human browser verification at 1366x768, 1920x1080, 2560x1440.
-    Checks: startup framing, resize no-clip, utility tab one-click access, quick-action hierarchy, HUD.
-  - Screenshots: PENDING -- 5 required artifacts (see PR checklist).
+  - Manual QA matrix executed at 1366x768, 1920x1080, 2560x1440 using
+    `docs/qa/runs/qa-run-2026-02-24-ui-shell-polish-8483098.md`.
+  - Result: **FAIL** with blocker/high defects clustered around shell framing and playtest HUD visibility.
+  - Primary blockers: `D-001` (left-rail tab readability), `D-002` (canvas right-edge clipping on startup/resize),
+    `D-005a` (HUD tick/position data not visible).
+  - Follow-ups logged: `D-005b`, `D-006` (runbook maintenance), `D-007`, `D-008`, `D-009`.
+  - Evidence captured under `docs/qa/evidence/2026-02-24-ui-shell-polish-8483098/`.
 - test count: 530 (16 contracts + 147 runtime-web + 367 ui-editor) -- updated 2026-02-24
   - Note: root `npm test` output shows the last workspace (ui-editor) summary as apparent total; use per-workspace counts.
 
