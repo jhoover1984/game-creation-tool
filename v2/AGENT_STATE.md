@@ -15,6 +15,11 @@
 ## Active Task
 None. Ready for next task.
 
+## Last Completed Work (2026-02-25 -- latest)
+
+- 2026-02-25 [Codex] UI-SHELL-POLISH-001 QA DOC SYNC -- Updated manual QA governance after first full run: patched `docs/runbooks/Manual QA Checklist.md` to use reliable TC-03 diagnostic triggers, updated Status Snapshot with completed manual QA outcome (FAIL), and normalized run defect taxonomy in `docs/qa/runs/qa-run-2026-02-24-ui-shell-polish-8483098.md` (`D-001`, `D-002`, `D-005a` blockers; follow-up defects logged).
+- 2026-02-25 [Codex] DOCS-GITFLOW -- Added `docs/runbooks/GitHub Workflow (Solo).md` and synced doc references in `docs/DOCUMENTATION_INDEX.md`, `docs/runbooks/PR Governance Checklist.md`, and `docs/status/V2 Status Snapshot.md` for protected-main + session-branch workflow.
+
 ## Last Completed Work (2026-02-24 -- latest)
 
 - 2026-02-24 [Codex] INTEG-CONTRACT-001 -- Added runtime playable-contract integration lock (`playable-contract.test.ts`) covering starter authored tile state, command-path player speed + undo/redo semantics, movement+interaction tick, and save/load invariants. Final gates clean: `npx tsc --build`, workspace tests (`16 + 147 + 358 = 521`), ASCII.

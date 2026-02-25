@@ -2,6 +2,9 @@
 
 Use this checklist before opening or updating a PR.
 
+For the end-to-end solo branching/merge flow, use:
+- `docs/runbooks/GitHub Workflow (Solo).md`
+
 ## Required PR Sections
 - `## Doc References`
 - `## Change-of-Plan Log`
@@ -22,6 +25,10 @@ If missing, CI will fail.
    - Run non-ASCII scan on touched files.
    - If non-ASCII is intentional, justify in PR.
    - Keep PR/task context path-referenced and scope-bounded.
+5. UI-impact changes:
+   - If shell/layout/viewport/inspector/playtest/onboarding touched, run `docs/runbooks/Manual QA Checklist.md`.
+   - Attach minimum screenshot set (see checklist for required filenames).
+   - Include completed signoff block in PR body under "Manual QA Evidence".
 
 ## Suggested Commands
 ```bash

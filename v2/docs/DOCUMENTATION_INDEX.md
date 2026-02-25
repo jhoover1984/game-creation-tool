@@ -76,8 +76,12 @@ Use this file as the entry point for all implementation work in `v2/`.
   - `docs/runbooks/Legacy Salvage High-ROI Plan.md`
 - Parity gates:
   - `docs/runbooks/Parity Gate Criteria.md`
+- Solo GitHub operating workflow:
+  - `docs/runbooks/GitHub Workflow (Solo).md`
 - PR governance checklist:
   - `docs/runbooks/PR Governance Checklist.md`
+- Manual QA checklist for UI-impact PRs:
+  - `docs/runbooks/Manual QA Checklist.md`
 - ADR decisions:
   - `docs/adrs/`
 
